@@ -74,7 +74,7 @@ const float curvature_max_ = 1;
 
 const float car_width_ 	= 0.2794;		// width
 const float car_length_ = 0.5334;		// length
-const float safety_margin_ 	= 0.2;		// margin of safety
+const float safety_margin_ 	= 0.1524;		// margin of safety
 const float wheelbase_ 	= 0.3302;	// wheelbase
 const Vector2f pmin(0, car_width_/2+safety_margin_); //coordinate of the closest point
 const Vector2f pmiddle((wheelbase_+car_length_)/2 + safety_margin_,  car_width_/2+safety_margin_); //coordinate of the intersection of left and front
@@ -200,6 +200,10 @@ void Navigation::samplePaths(float num) {
 void Navigation::trimPath(PathOption &path, Vector2f goal)
 {
 	float radius = 1/path.curvature;
+  if (path.curvature < 0){
+    radius = -radius;
+    goal.y() = - goal.y();
+  }
 	Vector2f rotation_center = {0, radius};
 
 	// goal angle with respect to the y axis
@@ -213,7 +217,14 @@ void Navigation::trimPath(PathOption &path, Vector2f goal)
 	{
 		path.free_path_length = trim_path_length;
 		path.obstruction = rotation_center + radius * goal/goal.norm();
-	} 
+    if (path.curvature < 0){
+      path.obstruction.y() = - path.obstruction.y();
+    }
+	}
+  if (path.curvature < 0){
+    goal.y() = - goal.y();
+  } 
+
 }
 
 
@@ -221,13 +232,12 @@ void Navigation::trimPath(PathOption &path, Vector2f goal)
 void Navigation::predictCollisions(PathOption& path)
 {
 	//std::cout << "======= predictCollisions =======" << std::endl;
-	
 
 	// Obstruction point (without considering obstacles)
-	float fpl = abs(M_PI/path.curvature);
-	Vector2f p_obstruction(0, 2/path.curvature);
-  
-  // if straight path
+  float radius = 1/path.curvature;
+	float fpl = abs(M_PI * radius);
+	Vector2f p_obstruction(0, 2*radius);
+
 	if (path.curvature == 0){
 		float min_fpl = 1000;
 		for (const auto &obs : ObstacleList_)
@@ -243,9 +253,9 @@ void Navigation::predictCollisions(PathOption& path)
 			}
 		}
 	}else{
-		//std::cout << "Entered FPL Arc Calcs" << std::endl;
-		float radius = 1/path.curvature;
-
+    if (path.curvature < 0){
+      radius = -radius;
+    }
 		Vector2f turning_center(0,radius); // rotation center
 
 		// turning radius of different points on the car
@@ -259,6 +269,9 @@ void Navigation::predictCollisions(PathOption& path)
 			// tramsform from global to local
 			Vector2f obs_loc = Odom2BaseLink(obs.loc);
 
+      if(path.curvature<0){
+        obs_loc.y() = - obs_loc.y();
+      }
 			// distance to obstacle from turning center
 			float r_obstacle = (turning_center - obs_loc).norm();  
 
@@ -294,9 +307,15 @@ void Navigation::predictCollisions(PathOption& path)
 				{
 					fpl = fpl_current;
 					p_obstruction = obs_loc;
+          // make sure p_obstruction copies obs_loc
+          if (path.curvature < 0){
+            p_obstruction.y() = -p_obstruction.y();
+          }
 				}
 			}
-
+      if(path.curvature<0){
+        obs_loc.y() = - obs_loc.y();
+      }
   	}
 
 	path.obstruction = p_obstruction;
@@ -309,29 +328,48 @@ void Navigation::predictCollisions(PathOption& path)
 // clearance is defined as the minimum distance from any point on the free path length to
 void Navigation::calculateClearance(PathOption &path){
 	float radius = 1/path.curvature;
-	float alpha = path.free_path_length/radius;
 	float min_clearance = 1000;
-
-	Vector2f turning_center(0,radius);
-	Vector2f closest_point(0,0);
-	for (const auto &obs : ObstacleList_){
-		Vector2f obs_point = Odom2BaseLink(obs.loc);
-		float r_obstacle = (turning_center - obs.loc).norm();
-		// check if obstacle is inside the cone defined by RC, start location and final location
-		float angle_obstacle = acos(obs_point.x()/r_obstacle);
-		if (angle_obstacle < alpha){
-			float clearance = abs((turning_center-obs_point).norm() - abs(radius));
-			if (clearance < min_clearance){
-				min_clearance = clearance;
-				closest_point = obs_point;
-			}
+  if (path.curvature == 0){
+    for (const auto &obs : ObstacleList_){
+		  Vector2f obs_loc = Odom2BaseLink(obs.loc);
+      if (obs_loc.x() > 0 && obs_loc.x() < path.free_path_length){
+        float clearance = abs(obs_loc.y());
+        if (clearance < min_clearance){
+          min_clearance = clearance;
+        }
+      }
 		}
-	}
-	path.clearance = min_clearance;
-	path.closest_point = closest_point;
+    path.clearance = min_clearance;
+	}else{
+    if (path.curvature<0){
+      radius = -radius;
+    }
+    float alpha = path.free_path_length/radius;
+    Vector2f turning_center(0,radius);
+    Vector2f closest_point(0,0);
+    for (const auto &obs : ObstacleList_){
+      Vector2f obs_loc = Odom2BaseLink(obs.loc);
+      if (path.curvature<0){
+        obs_loc.y() = -obs_loc.y();
+      }
+      float r_obstacle = (turning_center - obs_loc).norm();
+      // check if obstacle is inside the cone defined by RC, start location and final location
+      float angle_obstacle = acos(obs_loc.x()/r_obstacle);
+      if (angle_obstacle < alpha){
+        float clearance = abs((turning_center-obs_loc).norm() - abs(radius));
+        if (clearance < min_clearance){
+          min_clearance = clearance;
+        }
+      }
+      if(path.curvature<0){
+        obs_loc.y() = - obs_loc.y();
+      }
+    }
+    path.clearance = min_clearance;
+  }
 }
 
-// ArcRadius Calcs
+// Frank - ArcRadius Calcs
 double arc_radius(double p1x, double p1y, double p2x, double p2y)
 {
   double a = p2y - p1y;
@@ -360,7 +398,7 @@ double arc_radius(double p1x, double p1y, double p2x, double p2y)
   }
 }
 
-// ArcAngle Calcs
+// Frank - ArcAngle Calcs
 double arc_angle(double p1x, double p1y, double p2x, double p2y)
 {
   double b = p2x - p1x;
@@ -372,7 +410,7 @@ double arc_angle(double p1x, double p1y, double p2x, double p2y)
   return angle;
 }
 
-// ArcLength Calcs
+// Frank - ArcLength Calcs
 double arc_length(double p1x, double p1y, double p2x, double p2y)
 {
   double r = arc_radius(p1x, p1y, p2x, p2y);
@@ -450,7 +488,7 @@ PathOption Navigation::getBestPath(Vector2f goal_loc)
 	for (int i = 0; i < num_paths; i++)
 	{
     // the longer fpl, the better
-		float free_path_length_cost = -(free_path_length_vec.at(i)/max_free_path_length) * 0.5;
+		float free_path_length_cost = -(free_path_length_vec.at(i)/max_free_path_length) * 1.0;
 
 		// the smaller dist_to_goal, the better
 		float dist_to_goal_cost =  (dist_to_goal_vec.at(i)/min_dist_to_goal) * 1.0;
@@ -569,23 +607,19 @@ void Navigation::Run() {
   // samplePaths(5);
 
   Vector2f goal;
-  goal << 3.50, 0;
+  goal << 5.00, -0.5;
 
   PathOption BestPath = getBestPath(goal);
 
   // Odometry prediction = LatencyCompensation(0.1, 0.3, dt, odom_loc_.x(), odom_loc_.y(), odom_angle_, robot_vel_.x(), robot_vel_.y(), robot_omega_);
 
-  Odometry prediction = LatencyCompensation(0.1, 0.35, dt, odom_loc_.x(), odom_loc_.y(), odom_angle_, robot_vel_.x(), robot_vel_.y(), robot_omega_, start_time);
+  Odometry prediction = LatencyCompensation(0.1, 0.2, dt, odom_loc_.x(), odom_loc_.y(), odom_angle_, robot_vel_.x(), robot_vel_.y(), robot_omega_, start_time);
 
   float vx = prediction.vx;
   float vy = prediction.vy;
   float predict_vel = sqrt(pow(vx,2)+pow(vy,2));
 
-  double vel_command =  car_.TOC(dt, predict_vel, BestPath.free_path_length);
-  if (vel_command < 0)
-  {
-    vel_command = 0;
-  } 
+  double vel_command =  car_.TOC(dt, predict_vel, BestPath.free_path_length); 
  
    std::cout << "\n\n============================="
             << "\nBestPath FPL: " << BestPath.free_path_length
@@ -596,12 +630,16 @@ void Navigation::Run() {
 
   // ======================================================================================================
 
+
+
+
   // The control iteration goes here. 
   // Feel free to make helper functions to structure the control appropriately.
   
   // The latest observed point cloud is accessible via "point_cloud_"
   
   // Eventually, you will have to set the control values to issue drive commands:
+
   // Draw Cross
   Vector2f p2;
   p2 << (odom_start_loc_.x()+goal.x()) - odom_loc_.x(), (odom_start_loc_.y()+goal.y()) - odom_loc_.y();
