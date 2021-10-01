@@ -1,0 +1,75 @@
+// get lidar[x, y, theta][]
+// get map_coordinate_list from the GDC1.txt file
+
+
+// the intent here is to trim away any of the map sections which are not within lidar range
+// [0] is x coordinate
+// [1] is y coordinate
+// [i] is map point number in list
+while map_coordinate_list{
+    if map_coordinate_list[0][i] <= particle[0] + lidar_dist_max
+        continue;
+    else if map_coordinate_list[0][i] > particle[0] + lidar_dist_max{
+        if map_coordinate_list[0][i+1] - map_coordinate_list[0][i] > 0
+            continue;
+        else{
+            map_coordinate_list = map_coordinate_list[i].remove;
+            continue;
+        }
+    } else if map_coordinate_list[1][i] <= particle.[1] + lidar_dist_max
+        continue;
+    else if map_coordinate_list[1][i] > particle[1] + lidar_dist_max{
+        if map_coordinate_list[1][i+1] - map_coordinate_list[1][i] > 0
+            continue;
+        else{
+            map_coordinate_list = map_coordinate_list[i].remove;
+            continue;
+        }
+}
+
+// loops through new map list length to find theta and distance from particle to coordinate
+while map_coordinate_list{
+    theta__to_map[i] = atan((map_coordinate_list[0][i] - particle[0])/(map_coordinate_list[1][i] - particle[1]));
+    dist_to_map[i] = sqrt((map_coordinate_list[0][i] - particle[0])^2+(map_coordinate_list[1][i] - particle[1])^2);
+    // add new columns to map_coordinate_list
+    map_coordinate_list[2] = theta_to_map[i];
+    map_coordinate_list[3] = dist_to_map[i];
+}
+
+// for every lidar angle, find which map section ray hits - needs to be its own function
+while lidar[2]{ // i
+    while map_coordinate_list{ // j
+        if map_coordinate_list[2][j] <= lidar[2][i] <= map_coordinate_list[2][j+1]
+            return map_coordinate_list[j] map_coordinate_list[j+1];
+    }
+    // idk what to do if it doesn't hit anything
+}
+
+// gets distance from particle to wall
+// first [] is x or y
+// second [] is j (0) or j+1 (1) from previous return
+while lidar[2]{
+    if map_coordinates{
+        if map_coordinate_list[0][0] == map_coordinate_list[0][1]
+            particle_theoretical_dist = (map_coordinate_list[0][0] - particle[0])/cosin(lidar[2][i]);
+        else if map_coordinate_list[1][0] == map_coordinate_list[1][1]
+            particle_throretical_dist = (map_coordinate_list[1][1] - particle[1])/sin(lidar[2][i]);
+        else if //nothing was hit
+            particle_theoretical_dist = lidar_dist_max;
+    }
+}
+
+// weighting
+particle_probability = 1;
+while particle // j
+    while laser_scan // i 
+        if partical_actual_dist[j][i] < laser_dist_min || partical_actual_dist[j][i] > laser_dist_max
+            particle_probability_new = 0;
+        else if particle_actual_dist[j][i] < particle_theoretical_dist[j][i] - (laser_dist_min * min_dist_tuning)
+            particle_probability_new = exp(-(laser_dist_min * min_dist_tuning)^2 / ray_std_dev^2);
+        else if particle_actual_dist[j][i] > particle_theoretical_dist[j][i] + (laser_dist_max * max_dist_tuning)
+            particle_probability_new = exp(-(laser_dist_max * max_dist_tuning)^2 / ray_std_dev^2);
+        else
+            particle_probability_new = exp((particle_actyak_dist - particle_theoretical_dist)^2 / ray_std_dev^2));
+    if particle_probability != 0
+        particle_probability *= particle_probability_new;
