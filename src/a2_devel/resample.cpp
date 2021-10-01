@@ -63,6 +63,7 @@ std::vector <Particle> resample(std::vector <Particle> particle_vec)
     }
 
 
+
     // Main Loop: RESAMPLE (do we need to sort weights?)
     for (int i {0}; i < num_of_resamples; i++)
     {   
@@ -71,16 +72,17 @@ std::vector <Particle> resample(std::vector <Particle> particle_vec)
 
         // get a random number
         double random_num {get_random_double(0,total_weight)};
-       // std::cout << "\n[Iter: " << i << "]\n Random Number: " << random_num << std::endl; // debug
+        std::cout << "\n[Iter: " << i << "]\n Random Number: " << random_num << std::endl; // debug
 
         // loop through particle weights
         for (auto i_particle: particle_vec)
         {
+            std::cout << iter << std::endl;
             // zero case (not sure?)
             if (random_num == 0.00) 
             {
                 reduced_particle_vec.push_back(i_particle);
-                //std::cout << "\n Particle (" << iter << ") added to output vec" << std::endl; // debug
+                std::cout << "\n Particle (" << iter << ") added to output vec" << std::endl; // debug
             }
             // keep adding buckets if the random number is not equal
             else if (random_num > weight_sum)
@@ -90,13 +92,13 @@ std::vector <Particle> resample(std::vector <Particle> particle_vec)
                 // Check if random number is between two buckets
                 if (random_num == weight_sum)
                 {
-                    //std::cout << "random_num equal to weight TODO" << std::endl; // debug
+                    std::cout << "random_num equal to weight TODO" << std::endl; // debug
                 }
                 // Check if random number is less than the next bucket, and add to output vector
                 else if (random_num < weight_sum)
                 {
                     reduced_particle_vec.push_back(i_particle);
-                    //std::cout << "\n Particle (" << iter << ") added to output vec" << std::endl; // debug
+                    std::cout << "\n Particle (" << iter << ") added to output vec" << std::endl; // debug
                 }
             }
             iter++;
@@ -104,6 +106,35 @@ std::vector <Particle> resample(std::vector <Particle> particle_vec)
     }
 
     return reduced_particle_vec;
+}
+
+Particle get_optimal_particle(std::vector <Particle> reduced_particle_vec)
+{
+    // Total length of vector
+    int vector_length = reduced_particle_vec.size();
+
+    double sum_x {0};
+    double sum_y {0};
+    double sum_cos_theta {0};
+    double sum_sin_theta {0};
+
+
+    for (auto vec:reduced_particle_vec)
+    {
+        sum_x += vec.loc.x();
+        sum_y += vec.loc.y();
+        sum_cos_theta += cos(vec.angle);
+        sum_sin_theta += sin(vec.angle);
+    }
+
+    Particle optimal_particle;
+
+    optimal_particle.loc.x() = sum_x/vector_length;
+    optimal_particle.loc.y() = sum_y/vector_length;
+    optimal_particle.angle = atan2(sum_sin_theta/vector_length,sum_cos_theta/vector_length);
+    optimal_particle.weight = 0;
+    
+    return optimal_particle;
 }
 
 
@@ -114,6 +145,8 @@ int main(void)
     Particle particle_dict_2 {Eigen::Vector2f (1.4,2.3), 0.1, 0.60};
     Particle particle_dict_3 {Eigen::Vector2f (0.8,1.8), 0.4, 0.1};
     Particle particle_dict_4 {Eigen::Vector2f (0.9,2.1), 0.01, 0.7};
+    Particle particle_dict_5 {Eigen::Vector2f (0.87,1.87), 0.01, 0.8};
+    Particle particle_dict_6 {Eigen::Vector2f (1.7,0.98), 0.01, 0.9};
 
     // Build Sample Vector of Particle Vectors
     std::vector <Particle> particle_vec;
@@ -121,7 +154,8 @@ int main(void)
     particle_vec.push_back(particle_dict_2);
     particle_vec.push_back(particle_dict_3);
     particle_vec.push_back(particle_dict_4);
-
+    particle_vec.push_back(particle_dict_5);
+    particle_vec.push_back(particle_dict_6);
     int entry {0};
     // Practice
     std::cout << "********** Initial Vector ********" << std::endl;
@@ -150,7 +184,8 @@ int main(void)
 
     for (auto reduced_vec: particle_vec_reduced)
     {
-        std::cout << "[Particle: " << vector_entry << "]"
+        
+        std::cout << "[Particle: " << vector_entry<< "]"
                   << "\n x: " << reduced_vec.loc.x()
                   << "\n y: " << reduced_vec.loc.y()
                   << "\n theta: " << reduced_vec.angle
@@ -158,6 +193,19 @@ int main(void)
                   << std::endl;
         vector_entry++;
     }
+
+
+
+    // Get Optimal Particle
+
+    Particle opt_part = get_optimal_particle(particle_vec_reduced);
+
+    std::cout << "[Optimal Particle]"
+                  << "\n x: " << opt_part.loc.x()
+                  << "\n y: " << opt_part.loc.y()
+                  << "\n theta: " << opt_part.angle
+                  << "\n weight: " << opt_part.weight
+                  << std::endl;
 
     return 0;
 }
