@@ -15,6 +15,9 @@ struct Particle {
   double weight;
 };
 
+// ============================================================================================================================
+// RESAMPLE PARTICLES
+
 // Helper Function: Random Number Generator
 // CHECK
 double get_random_double(int min, int max)
@@ -38,87 +41,96 @@ double get_random_double(int min, int max)
     return a_random_double;
 }
 
-// Resample Based on Weights
-std::vector <Particle> resample(std::vector <Particle> particle_vec)
+// Main Function: Resample Each Particle
+std::vector <Particle> resample(std::vector <Particle> const &particle_vec)
 {
-    // initialize return vector (vector of the kept particles)
-    std::vector <Particle> reduced_particle_vec;
+    
+    // Predefine the Number of Resamples; set_parameter
+    int num_of_resamples {100};
 
-    // predefine the number of resamples; set_parameter
-    int num_of_resamples {10};
+    // Initializations
+    std::vector <Particle> reduced_particle_vec; // return vector (vector of the kept particles)
+    double weight_sum {0};                       // comparison variable 
+    double total_weight {0};                     // total weight of all particles
+    double random_num {0};                       // normal random number variable
+    int k {0};                                   // edge case variable
 
-    // initialize comparison variable
-    double weight_sum {0};
+    // Get Length of Input Vector for Looping
+    int input_vec_length = particle_vec.size();
 
-    // initialize total weight of all particles
-    double total_weight {0};
-
-    // debug iter
-    int iter {1};
-
-    // compute sum of particle weights to get container bounds
+    // Compute Sum of Particle Weights to Get Upper Container Bound
     for (auto get_particle: particle_vec)
-    {
         total_weight += get_particle.weight;
-    }
-
-
-
-    // Main Loop: RESAMPLE (do we need to sort weights?)
+    
+    // Main Loop; RESAMPLE
     for (int i {0}; i < num_of_resamples; i++)
     {   
         // reset comparison variable
         weight_sum = 0;
 
         // get a random number
-        double random_num {get_random_double(0,total_weight)};
-        std::cout << "\n[Iter: " << i << "]\n Random Number: " << random_num << std::endl; // debug
+        random_num = get_random_double(0.00,total_weight);
+        std::cout << "\n[Iter: " << i << "]\n Random Number: " << random_num << std::endl; // _____________ debug
 
-        // loop through particle weights
-        for (auto i_particle: particle_vec)
+        // loop through each particle weight/bucket
+        for (int j {0}; j < input_vec_length; j++)
         {
-            std::cout << iter << std::endl;
-            // zero case (not sure?)
+            // zero case
             if (random_num == 0.00) 
             {
-                reduced_particle_vec.push_back(i_particle);
-                std::cout << "\n Particle (" << iter << ") added to output vec" << std::endl; // debug
+                reduced_particle_vec.push_back(particle_vec[0]);
+                //std::cout << " Particle (" << iter << ") equaled min; added to output vec" << std::endl; // debug
+                break;
             }
-            // keep adding buckets if the random number is not equal
+            // max case
+            else if (random_num == total_weight)
+            {
+                reduced_particle_vec.push_back(particle_vec[input_vec_length-1]);
+                //std::cout << " Particle (" << iter << ") equaled max; added to output vec" << std::endl; // debug
+                break;
+            }
+            // middle bucket cases; keep adding buckets if the random number is not equal
             else if (random_num > weight_sum)
             {
-                weight_sum += i_particle.weight;
+                // Add a weight
+                weight_sum += particle_vec[j].weight;
 
-                // Check if random number is between two buckets
+                // Check if random number is on the edge of two buckets
                 if (random_num == weight_sum)
                 {
-                    std::cout << "random_num equal to weight TODO" << std::endl; // debug
+                    k = (particle_vec[j].weight <= particle_vec[j+1].weight) ? j+1 : j; 
+                    reduced_particle_vec.push_back(particle_vec[k]);
+                    //std::cout << " Particle (" << iter << ") on edge; added to output vec" << std::endl; // debug
                 }
                 // Check if random number is less than the next bucket, and add to output vector
                 else if (random_num < weight_sum)
                 {
-                    reduced_particle_vec.push_back(i_particle);
-                    std::cout << "\n Particle (" << iter << ") added to output vec" << std::endl; // debug
+                    reduced_particle_vec.push_back(particle_vec[j]);
+                    //std::cout << " Particle (" << iter << ") added to output vec" << std::endl; // ________ debug
                 }
             }
-            iter++;
         }
     }
-
     return reduced_particle_vec;
 }
 
+// ============================================================================================================================
+// FIND BEST GUESS LOCATION
+
+// Main Function: Average over the every particle
 Particle get_optimal_particle(std::vector <Particle> reduced_particle_vec)
 {
-    // Total length of vector
+    // Get Total Length of Input Vector
     int vector_length = reduced_particle_vec.size();
 
+    // Initializations
     double sum_x {0};
     double sum_y {0};
     double sum_cos_theta {0};
     double sum_sin_theta {0};
+    Particle optimal_particle;
 
-
+    // Summations for all variables
     for (auto vec:reduced_particle_vec)
     {
         sum_x += vec.loc.x();
@@ -127,12 +139,11 @@ Particle get_optimal_particle(std::vector <Particle> reduced_particle_vec)
         sum_sin_theta += sin(vec.angle);
     }
 
-    Particle optimal_particle;
-
+    // Averages for x, y, and theta; weight hard coded to 1
     optimal_particle.loc.x() = sum_x/vector_length;
     optimal_particle.loc.y() = sum_y/vector_length;
     optimal_particle.angle = atan2(sum_sin_theta/vector_length,sum_cos_theta/vector_length);
-    optimal_particle.weight = 0;
+    optimal_particle.weight = 1;
     
     return optimal_particle;
 }
@@ -145,8 +156,8 @@ int main(void)
     Particle particle_dict_2 {Eigen::Vector2f (1.4,2.3), 0.1, 0.60};
     Particle particle_dict_3 {Eigen::Vector2f (0.8,1.8), 0.4, 0.1};
     Particle particle_dict_4 {Eigen::Vector2f (0.9,2.1), 0.01, 0.7};
-    Particle particle_dict_5 {Eigen::Vector2f (0.87,1.87), 0.01, 0.8};
-    Particle particle_dict_6 {Eigen::Vector2f (1.7,0.98), 0.01, 0.9};
+    Particle particle_dict_5 {Eigen::Vector2f (0.87,1.87), 0.01, 0.9};
+    Particle particle_dict_6 {Eigen::Vector2f (1.7,0.98), 0.01, 0.8};
 
     // Build Sample Vector of Particle Vectors
     std::vector <Particle> particle_vec;
@@ -156,8 +167,8 @@ int main(void)
     particle_vec.push_back(particle_dict_4);
     particle_vec.push_back(particle_dict_5);
     particle_vec.push_back(particle_dict_6);
+    
     int entry {0};
-    // Practice
     std::cout << "********** Initial Vector ********" << std::endl;
     double total_weight {0};
     for(auto vector: particle_vec)
@@ -171,17 +182,14 @@ int main(void)
         entry++;
     }
 
-
-
     // Reduced Vector of Particles
     std::vector <Particle> particle_vec_reduced;
-    std::cout << "======== Resampled Vector =========" << std::endl;
-
     // CALL MAIN RESAMPLE FUNCTION
     particle_vec_reduced = resample(particle_vec);
 
-    int vector_entry {0};
+    std::cout << "\n======== Resampled Vector =========" << std::endl;
 
+    int vector_entry {0};
     for (auto reduced_vec: particle_vec_reduced)
     {
         
@@ -194,9 +202,8 @@ int main(void)
         vector_entry++;
     }
 
-
-
     // Get Optimal Particle
+    std::cout << "\n-------- Optimal Particle --------" << std::endl;
 
     Particle opt_part = get_optimal_particle(particle_vec_reduced);
 
