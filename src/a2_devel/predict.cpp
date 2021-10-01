@@ -101,6 +101,7 @@ Eigen::Vector3d sample_motion_model_odometry(Eigen::Vector3d odom_old, Eigen::Ve
     double a4 {0.4};
 
     // get relative motion with variance factored in
+    // CHECK: Should this be minus?
     double del_rot_1_hat = rel_mot(0) - sample_normal_dist( a1*pow(rel_mot(0),2) + a2*pow(rel_mot(1),2) );
     double del_trans_hat = rel_mot(1) - sample_normal_dist( a3*pow(rel_mot(1),2) + a4*pow(rel_mot(0),2) + a4*pow(rel_mot(2),2) );
     double del_rot_2_hat = rel_mot(2) - sample_normal_dist( a1*pow(rel_mot(2),2) + a2*pow(rel_mot(1),2) );
