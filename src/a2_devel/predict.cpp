@@ -8,7 +8,7 @@
 #include "eigen3/Eigen/Dense"
 #include "eigen3/Eigen/Geometry"
 
-// Random Number Generator
+// Helper Function: Random Number Generator
 // CHECK
 double get_random_double(int min, int max)
 {
@@ -36,7 +36,7 @@ double get_random_double(int min, int max)
 // 
 // returns vector of where the current pose should be based on current & past odom and the last known pose
 
-// Helper Function: calculates relative motion over new and old x, y, and theta readings
+// Helper Function: calculates relative motion over new and old x, y, and theta readings from robot odom
 // CHECK
 Eigen::Vector3d get_relative_motion(Eigen::Vector3d odom_old, Eigen::Vector3d odom_cur)
 {
@@ -95,10 +95,10 @@ Eigen::Vector3d sample_motion_model_odometry(Eigen::Vector3d odom_old, Eigen::Ve
     Eigen::Vector3d rel_mot (get_relative_motion(odom_old, odom_cur));
     
     // set alpha variance paramaters; set_parameter
-    double a1 {0.5};
-    double a2 {0.5};
-    double a3 {0.5};
-    double a4 {0.5};
+    double a1 {0.4};
+    double a2 {0.4};
+    double a3 {0.4};
+    double a4 {0.4};
 
     // get relative motion with variance factored in
     double del_rot_1_hat = rel_mot(0) - sample_normal_dist( a1*pow(rel_mot(0),2) + a2*pow(rel_mot(1),2) );
