@@ -3,3 +3,4 @@ build
 bin
 lib
 data
+src/a2_devel/predict.exe
