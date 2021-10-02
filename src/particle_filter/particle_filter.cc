@@ -161,7 +161,7 @@ void ParticleFilter::Resample() {
       weight_sum = 0;
 
       // get a random number
-      float random_num = rng_.UniformRandom(0, 1);
+      float random_num = rng_.UniformRandom(0, total_weight);
       std::cout << "\n[Iter: " << i << "]\n Random Number: " << random_num << std::endl; // _____________ debug
 
       // loop through each particle weight/bucket
