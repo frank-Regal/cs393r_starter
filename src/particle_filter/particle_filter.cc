@@ -253,8 +253,8 @@ void ParticleFilter::GetLocation(Eigen::Vector2f* loc_ptr,
   // Compute the best estimate of the robot's location based on the current set
   // of particles. The computed values must be set to the `loc` and `angle`
   // variables to return them. Modify the following assignments:
-  loc = Vector2f(0, 0);
-  angle = 0;
+  //loc = Vector2f(0, 0);
+  //angle = 0;
 
   // Get Total Length of Input Vector
     int vector_length = particles_.size();
