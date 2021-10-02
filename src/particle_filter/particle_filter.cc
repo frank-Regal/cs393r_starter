@@ -137,11 +137,79 @@ void ParticleFilter::Resample() {
   // After resampling:
   // particles_ = new_particles;
 
+  // Predefine the Number of Resamples; set_parameter
+  int num_of_resamples {100};
+
+  // Initializations
+  std::vector <Particle> reduced_particle_vec; // return vector (vector of the kept particles)
+  double weight_sum {0};                       // comparison variable 
+  double total_weight {0};                     // total weight of all particles
+  double random_num {0};                       // normal random number variable
+  int k {0};                                   // edge case variable
+
+  // Get Length of Input Vector for Looping
+  int input_vec_length = particles_.size();
+
+  // Compute Sum of Particle Weights to Get Upper Container Bound
+  for (auto get_particle: particles_)
+      total_weight += get_particle.weight;
+  
+  // Main Loop; RESAMPLE
+  for (int i {0}; i < num_of_resamples; i++)
+  {   
+      // reset comparison variable
+      weight_sum = 0;
+
+      // get a random number
+      float random_num = rng_.UniformRandom(0, 1);
+      std::cout << "\n[Iter: " << i << "]\n Random Number: " << random_num << std::endl; // _____________ debug
+
+      // loop through each particle weight/bucket
+      for (int j {0}; j < input_vec_length; j++)
+      {
+          // zero case
+          if (random_num == 0.00) 
+          {
+              reduced_particle_vec.push_back(particles_[0]);
+              //std::cout << " Particle (" << iter << ") equaled min; added to output vec" << std::endl; // debug
+              break;
+          }
+          // max case
+          else if (random_num == total_weight)
+          {
+              reduced_particle_vec.push_back(particles_[input_vec_length-1]);
+              //std::cout << " Particle (" << iter << ") equaled max; added to output vec" << std::endl; // debug
+              break;
+          }
+          // middle bucket cases; keep adding buckets if the random number is not equal
+          else if (random_num > weight_sum)
+          {
+              // Add a weight
+              weight_sum += particles_[j].weight;
+
+              // Check if random number is on the edge of two buckets
+              if (random_num == weight_sum)
+              {
+                  k = (particles_[j].weight <= particles_[j+1].weight) ? j+1 : j; 
+                  reduced_particle_vec.push_back(particles_[k]);
+                  //std::cout << " Particle (" << iter << ") on edge; added to output vec" << std::endl; // debug
+              }
+              // Check if random number is less than the next bucket, and add to output vector
+              else if (random_num < weight_sum)
+              {
+                  reduced_particle_vec.push_back(particles_[j]);
+                  //std::cout << " Particle (" << iter << ") added to output vec" << std::endl; // ________ debug
+              }
+          }
+      }
+  }
+
+  particles_ = reduced_particle_vec;
   // You will need to use the uniform random number generator provided. For
   // example, to generate a random number between 0 and 1:
-  float x = rng_.UniformRandom(0, 1);
-  printf("Random number drawn from uniform distribution between 0 and 1: %f\n",
-         x);
+  // float x = rng_.UniformRandom(0, 1);
+  // printf("Random number drawn from uniform distribution between 0 and 1: %f\n",
+  //        x);
 }
 
 void ParticleFilter::ObserveLaser(const vector<float>& ranges,
@@ -187,6 +255,29 @@ void ParticleFilter::GetLocation(Eigen::Vector2f* loc_ptr,
   // variables to return them. Modify the following assignments:
   loc = Vector2f(0, 0);
   angle = 0;
+
+  // Get Total Length of Input Vector
+    int vector_length = particles_.size();
+
+    // Initializations
+    double sum_x {0};
+    double sum_y {0};
+    double sum_cos_theta {0};
+    double sum_sin_theta {0};
+
+    // Summations for all variables
+    for (auto vec:particles_)
+    {
+        sum_x += vec.loc.x();
+        sum_y += vec.loc.y();
+        sum_cos_theta += cos(vec.angle);
+        sum_sin_theta += sin(vec.angle);
+    }
+
+    // Averages for x, y, and theta; weight hard coded to 1
+    loc.x() = sum_x/vector_length;
+    loc.y() = sum_y/vector_length;
+    angle = atan2(sum_sin_theta/vector_length,sum_cos_theta/vector_length);
 }
 
 
