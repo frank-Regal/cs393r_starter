@@ -145,7 +145,7 @@ void ParticleFilter::Resample() {
   std::vector <Particle> reduced_particle_vec; // return vector (vector of the kept particles)
   double weight_sum {0};                       // comparison variable 
   double total_weight {0};                     // total weight of all particles
-  double random_num {0};                       // normal random number variable
+  //double random_num {0};                       // normal random number variable
   int k {0};                                   // edge case variable
 
   // Get Length of Input Vector for Looping
@@ -250,12 +250,13 @@ void ParticleFilter::Predict(const Eigen::Vector3d &odom_cur) {
 
   // get relative motion with variance factored in
   // CHECK: Should this be minus?
-  double del_rot_1_hat = rel_mot(0) - rng_.Gaussian(0, (a1*pow(del_rot1,2) + a2*pow(del_trans,2)) );
-  double del_trans_hat = rel_mot(1) - rng_.Gaussian(0, (a3*pow(del_trans,2) + a4*pow(del_rot1,2) + a4*pow(del_rot2,2)) );
-  double del_rot_2_hat = rel_mot(2) - rng_.Gaussian(0, (a1*pow(del_rot2,2) + a2*pow(del_trans,2)) );
+  double del_rot_1_hat = del_rot1 - rng_.Gaussian(0, (a1*pow(del_rot1,2) + a2*pow(del_trans,2)) );
+  double del_trans_hat = del_trans - rng_.Gaussian(0, (a3*pow(del_trans,2) + a4*pow(del_rot1,2) + a4*pow(del_rot2,2)) );
+  double del_rot_2_hat = del_rot2 - rng_.Gaussian(0, (a1*pow(del_rot2,2) + a2*pow(del_trans,2)) );
 
+  int length_of_particles_vec = particles_.size();
   // Loop through current list of particles and update the particle location vector based on odom readings
-  for (int i {0}; i < particles_.size(); i++)
+  for (int i {0}; i < length_of_particles_vec; i++)
   {
     particles_[i].loc.x() = particles_[i].loc.x() + del_trans_hat * cos( particles_[i].angle + del_rot_1_hat );
     particles_[i].loc.y() = particles_[i].loc.y() + del_trans_hat * sin( particles_[i].angle + del_rot_1_hat );

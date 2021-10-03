@@ -189,7 +189,7 @@ void OdometryCallback(const nav_msgs::Odometry& msg) {
   //const float odom_angle =
   //    2.0 * atan2(msg.pose.pose.orientation.z, msg.pose.pose.orientation.w);
   
-  const Eigen::Vector3d odom_loc;
+  Eigen::Vector3d odom_loc;
   odom_loc(0) = msg.pose.pose.position.x;
   odom_loc(1) = msg.pose.pose.position.y;
   odom_loc(2) = (2.0 * atan2(msg.pose.pose.orientation.z, msg.pose.pose.orientation.w));

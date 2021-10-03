@@ -86,9 +86,6 @@ class ParticleFilter {
                               float angle_max,
                               std::vector<Eigen::Vector2f>* scan);
 
-  // ADD: Gets the relative motion between current and last odom values.
-  Eigen::Vector3d ParticleFilter::get_relative_motion(const Eigen::Vector3d &odom_old, const Eigen::Vector3d &odom_cur);
-
  private:
 
   // List of particles being tracked.
