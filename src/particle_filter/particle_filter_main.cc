@@ -184,13 +184,24 @@ void OdometryCallback(const nav_msgs::Odometry& msg) {
   if (FLAGS_v > 0) {
     printf("Odometry t=%f\n", msg.header.stamp.toSec());
   }
-  const Vector2f odom_loc(msg.pose.pose.position.x, msg.pose.pose.position.y);
-  const float odom_angle =
-      2.0 * atan2(msg.pose.pose.orientation.z, msg.pose.pose.orientation.w);
-  particle_filter_.Predict(odom_loc, odom_angle);
+
+  //const Vector2f odom_loc(msg.pose.pose.position.x, msg.pose.pose.position.y);
+  //const float odom_angle =
+  //    2.0 * atan2(msg.pose.pose.orientation.z, msg.pose.pose.orientation.w);
+  
+  const Eigen::Vector3d odom_loc;
+  odom_loc(0) = msg.pose.pose.position.x;
+  odom_loc(1) = msg.pose.pose.position.y;
+  odom_loc(2) = (2.0 * atan2(msg.pose.pose.orientation.z, msg.pose.pose.orientation.w));
+
+  // Update Location of Each Particle Based on New Odom Data
+  particle_filter_.Predict(odom_loc);
+
+  // Update Best Location of Robot
   Vector2f robot_loc(0, 0);
   float robot_angle(0);
   particle_filter_.GetLocation(&robot_loc, &robot_angle);
+
   amrl_msgs::Localization2DMsg localization_msg;
   localization_msg.pose.x = robot_loc.x();
   localization_msg.pose.y = robot_loc.y();
