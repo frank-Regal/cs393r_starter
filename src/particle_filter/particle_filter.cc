@@ -250,9 +250,9 @@ void ParticleFilter::Predict(const Eigen::Vector3d &odom_cur) {
 
   // get relative motion with variance factored in
   // CHECK: Should this be minus?
-  double del_rot_1_hat = del_rot1 - rng_.Gaussian(0, (a1*pow(del_rot1,2) + a2*pow(del_trans,2)) );
-  double del_trans_hat = del_trans - rng_.Gaussian(0, (a3*pow(del_trans,2) + a4*pow(del_rot1,2) + a4*pow(del_rot2,2)) );
-  double del_rot_2_hat = del_rot2 - rng_.Gaussian(0, (a1*pow(del_rot2,2) + a2*pow(del_trans,2)) );
+  double del_rot_1_hat = del_rot1 - rng_.Gaussian(0, sqrt(a1*pow(del_rot1,2) + a2*pow(del_trans,2)) );
+  double del_trans_hat = del_trans - rng_.Gaussian(0, sqrt(a3*pow(del_trans,2) + a4*pow(del_rot1,2) + a4*pow(del_rot2,2)) );
+  double del_rot_2_hat = del_rot2 - rng_.Gaussian(0, sqrt(a1*pow(del_rot2,2) + a2*pow(del_trans,2)) );
 
   int length_of_particles_vec = particles_.size();
   // Loop through current list of particles and update the particle location vector based on odom readings
