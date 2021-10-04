@@ -244,6 +244,14 @@ void ParticleFilter::Initialize(const string& map_file,
   // was received from the log. Initialize the particles accordingly, e.g. with
   // some distribution around the provided location and angle.
   map_.Load(map_file);
+
+  // TODO: set_parameter for Gaussian standard deviation
+  for(int i {0}; i < 100; i++){
+    particles_[i].loc.x() = loc.x() + rng_.Gaussian(0.0, 2.0);
+    particles_[i].loc.y() = loc.y() + rng_.Gaussian(0.0, 2.0);
+    particles_[i].angle = angle + rng_.Gaussian(0.0, 2.0);
+  }
+  // take location and angle and pass through the Gaussian to get a bunch of points
 }
 
 void ParticleFilter::GetLocation(Eigen::Vector2f* loc_ptr, 
