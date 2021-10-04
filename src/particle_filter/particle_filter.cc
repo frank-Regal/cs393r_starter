@@ -203,6 +203,10 @@ void ParticleFilter::Resample() {
               }
           }
       }
+
+      // CHECK 
+      particles_.erase(particles_.begin(), particles_.end());
+      particles_ = reduced_particle_vec;
   }
 
   particles_ = reduced_particle_vec;
