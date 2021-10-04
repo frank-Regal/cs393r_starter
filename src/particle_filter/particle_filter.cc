@@ -54,8 +54,8 @@ config_reader::ConfigReader config_reader_({"config/particle_filter.lua"});
 
 ParticleFilter::ParticleFilter() :
     odom_old(0,0,0),
-    prev_odom_loc_(0, 0),
-    prev_odom_angle_(0),
+    prev_odom_loc_(0, 0), // not needed CHECK
+    prev_odom_angle_(0),  // not needed CHECK
     odom_initialized_(false) {}
 
 void ParticleFilter::GetParticles(vector<Particle>* particles) const {
