@@ -204,6 +204,7 @@ void ParticleFilter::Resample() {
           }
       }
 
+      // Erase existing particles_ vector and fill with resampled particle vector (reduced_particle_vec)
       // CHECK 
       particles_.erase(particles_.begin(), particles_.end());
       particles_ = reduced_particle_vec;
