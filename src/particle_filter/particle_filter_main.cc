@@ -260,6 +260,8 @@ int main(int argc, char** argv) {
   ros::NodeHandle n;
   InitializeMsgs();
 
+  PublishVisualization();
+
   visualization_publisher_ =
       n.advertise<VisualizationMsg>("visualization", 1);
   localization_publisher_ =

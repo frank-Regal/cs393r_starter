@@ -282,11 +282,20 @@ void ParticleFilter::Initialize(const string& map_file,
   // some distribution around the provided location and angle.
   map_.Load(map_file);
 
+  std::cout << "Initialization Called" << std::endl; //debug
+  std::cout << "loc x: " << loc.x() << std::endl; // debug
+  std::cout << "loc y: " << loc.y() << std::endl; //debug
+  std::cout << "anlge: " << angle << std::endl; //debug
+
+  Particle init;
+
   // TODO: set_parameter for Gaussian standard deviation
   for(int i {0}; i < 100; i++){
-    particles_[i].loc.x() = loc.x() + rng_.Gaussian(0.0, 2.0);
-    particles_[i].loc.y() = loc.y() + rng_.Gaussian(0.0, 2.0);
-    particles_[i].angle = angle + rng_.Gaussian(0.0, 2.0);
+    init.loc.x() = loc.x() + rng_.Gaussian(0.0, 2.0);
+    init.loc.y() = loc.y() + rng_.Gaussian(0.0, 2.0);
+    init.angle = angle + rng_.Gaussian(0.0, 2.0);
+    init.weight = 0;
+    particles_.push_back(init);
   }
   // take location and angle and pass through the Gaussian to get a bunch of points
 }
@@ -303,7 +312,11 @@ void ParticleFilter::GetLocation(Eigen::Vector2f* loc_ptr,
 
   // Get Total Length of Input Vector
     int vector_length = particles_.size();
+    
+    if (vector_length == 0)
+      vector_length =1;
 
+    std::cout << "Get Location: " << vector_length << std::endl;
     // Initializations
     double sum_x {0};
     double sum_y {0};
