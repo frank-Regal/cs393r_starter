@@ -53,6 +53,7 @@ namespace particle_filter {
 config_reader::ConfigReader config_reader_({"config/particle_filter.lua"});
 
 ParticleFilter::ParticleFilter() :
+    odom_old(0,0,0),
     prev_odom_loc_(0, 0),
     prev_odom_angle_(0),
     odom_initialized_(false) {}
@@ -144,7 +145,7 @@ void ParticleFilter::Resample() {
   std::vector <Particle> reduced_particle_vec; // return vector (vector of the kept particles)
   double weight_sum {0};                       // comparison variable 
   double total_weight {0};                     // total weight of all particles
-  double random_num {0};                       // normal random number variable
+  //double random_num {0};                       // normal random number variable
   int k {0};                                   // edge case variable
 
   // Get Length of Input Vector for Looping
@@ -221,20 +222,51 @@ void ParticleFilter::ObserveLaser(const vector<float>& ranges,
   // Call the Update and Resample steps as necessary.
 }
 
-void ParticleFilter::Predict(const Vector2f& odom_loc,
-                             const float odom_angle) {
+void ParticleFilter::Predict(const Eigen::Vector3d &odom_cur) {
   // Implement the predict step of the particle filter here.
   // A new odometry value is available (in the odom frame)
   // Implement the motion model predict step here, to propagate the particles
   // forward based on odometry.
 
+  // Reference: Table 5.6 in Sebastian Thrun, Wolfram Bugard & Dieter Fox
 
-  // You will need to use the Gaussian random number generator provided. For
-  // example, to generate a random number from a Gaussian with mean 0, and
-  // standard deviation 2:
-  float x = rng_.Gaussian(0.0, 2.0);
-  printf("Random number drawn from Gaussian distribution with 0 mean and "
-         "standard deviation of 2 : %f\n", x);
+  // Calculate Difference Between New and Old Odom Readings
+  double del_x {odom_cur(0)-odom_old(0)};
+  double del_y {odom_cur(1)-odom_old(1)};
+  double del_theta {odom_cur(2)-odom_old(2)};
+
+  // Delta Rotation 1 
+  double del_rot1 = atan2(del_y,del_x) - odom_old(2);
+  // Delta Translation Between Current and Last Odom Position
+  double del_trans = sqrt(pow(del_x,2) + pow(del_y,2));
+  // Delta Rotation 2
+  double del_rot2 = del_theta - del_rot1;
+  
+  // set alpha variance paramaters; set_parameter
+  double a1 {0.4};
+  double a2 {0.4};
+  double a3 {0.4};
+  double a4 {0.4};
+
+  // get relative motion with variance factored in
+  // CHECK: Should this be minus?
+  double del_rot_1_hat = del_rot1 - rng_.Gaussian(0, sqrt(a1*pow(del_rot1,2) + a2*pow(del_trans,2)) );
+  double del_trans_hat = del_trans - rng_.Gaussian(0, sqrt(a3*pow(del_trans,2) + a4*pow(del_rot1,2) + a4*pow(del_rot2,2)) );
+  double del_rot_2_hat = del_rot2 - rng_.Gaussian(0, sqrt(a1*pow(del_rot2,2) + a2*pow(del_trans,2)) );
+
+  int length_of_particles_vec = particles_.size();
+  // Loop through current list of particles and update the particle location vector based on odom readings
+  for (int i {0}; i < length_of_particles_vec; i++)
+  {
+    particles_[i].loc.x() = particles_[i].loc.x() + del_trans_hat * cos( particles_[i].angle + del_rot_1_hat );
+    particles_[i].loc.y() = particles_[i].loc.y() + del_trans_hat * sin( particles_[i].angle + del_rot_1_hat );
+    particles_[i].angle = particles_[i].angle + del_rot_1_hat + del_rot_2_hat;
+  }
+
+  // Set current odom values to previous values for next call to predict
+  odom_old(0) = odom_cur(0); // x odom
+  odom_old(1) = odom_cur(1); // y odom
+  odom_old(2) = odom_cur(2); // angle odom
 }
 
 void ParticleFilter::Initialize(const string& map_file,
@@ -261,8 +293,8 @@ void ParticleFilter::GetLocation(Eigen::Vector2f* loc_ptr,
   // Compute the best estimate of the robot's location based on the current set
   // of particles. The computed values must be set to the `loc` and `angle`
   // variables to return them. Modify the following assignments:
-  loc = Vector2f(0, 0);
-  angle = 0;
+  //loc = Vector2f(0, 0);
+  //angle = 0;
 
   // Get Total Length of Input Vector
     int vector_length = particles_.size();
@@ -282,7 +314,7 @@ void ParticleFilter::GetLocation(Eigen::Vector2f* loc_ptr,
         sum_sin_theta += sin(vec.angle);
     }
 
-    // Averages for x, y, and theta; weight hard coded to 1
+    // Averages for x, y, and theta;
     loc.x() = sum_x/vector_length;
     loc.y() = sum_y/vector_length;
     angle = atan2(sum_sin_theta/vector_length,sum_cos_theta/vector_length);
