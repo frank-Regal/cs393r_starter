@@ -162,7 +162,7 @@ void ParticleFilter::GetPredictedPointCloud(const Vector2f& loc,
       
       // Initialize Return Variable of the Location where the Ray Intersects
       Eigen::Vector2f intersection_point;
-      
+
       // Compare Map Text File Lines to Theoretical Laser Rays from Each Particle
       bool intersects = map_line.Intersection(laser_ray, &intersection_point);
       
@@ -197,28 +197,37 @@ void ParticleFilter::Update(const vector<float>& ranges,
   // on the observation likelihood computed by relating the observation to the
   // predicted point cloud.
 
+  // Setting Up Output Variable
   Particle& particle = *p_ptr;
 
-  // Initialize point cloud vector
+  // Initialize point cloud vector to fill from GetPredictedPointCloud
   vector<Vector2f> predicted_point_cloud;
+
   // Fill point cloud vector
   GetPredictedPointCloud(particle.loc, particle.angle, 
                          ranges.size(), range_min, range_max, 
                          angle_min, angle_max, &predicted_point_cloud);
 
-  // Resize lidar scan range
+  // Resize lidar scan range (Number of Rays)
   vector<float> resized_ranges(predicted_point_cloud.size());
   int lidar_ray_step_size = ranges.size() / predicted_point_cloud.size();
 
+  // Calculating the Size of Predicted Point Cloud Length
   int predicted_point_cloud_length = predicted_point_cloud.size();
 
+  // Resizing the Actual Laser Scan Ranges
   for(int i = 0; i < predicted_point_cloud_length; i++)
     resized_ranges[i] = ranges[lidar_ray_step_size*i];
 
-  // Tuning parameters for the minimum and maximum distances of the laser scanner
+  // Tuning parameters for the minimum and maximum distances of the laser scanner; set_parameter
   double min_dist_tuning = 0.5;
   double max_dist_tuning = 0.5;
-  // Standard deviation of LIDAR
+
+  // Adding tuning params for Min and Max Ranges of Physical Laser Scanner
+  float min_range_with_tuning = range_min * min_dist_tuning;
+  float max_range_with_tuning = range_max * max_dist_tuning;
+
+  // Standard deviation of Physical LIDAR System; set_parameter
   double ray_std_dev = 0.125;
 
   // Reset variables between each point cloud
@@ -227,7 +236,7 @@ void ParticleFilter::Update(const vector<float>& ranges,
 
   for(int i = 0; i < predicted_point_cloud_length; i++)
   {
-    // Laser scanner location is offset from the particle location
+    // Physical Laser Scanner Location is Offset From the Particle Location
     float laser_scanner_loc_x = particle.loc.x() + 0.2*cos(particle.angle);
     float laser_scanner_loc_y = particle.loc.y() + 0.2*sin(particle.angle);
 
@@ -239,22 +248,24 @@ void ParticleFilter::Update(const vector<float>& ranges,
     float theoretical_dist_y = predicted_point_cloud[i].y() - laser_scanner_loc_y;
     float particle_theoretical_distance = sqrt(pow(theoretical_dist_x, 2)+pow(theoretical_dist_y, 2));
 
-    float min_range_with_tuning = range_min * min_dist_tuning;
-    float max_range_with_tuning = range_max * max_dist_tuning;
+    // Calculating Distance Comparison
     float delta_distance = particle_actual_distance - particle_theoretical_distance;
 
     // Function for weighting the probability of particle being in the location found
-    if(particle_actual_distance < range_min or particle_actual_distance > range_max)
+    if(particle_actual_distance < min_range_with_tuning or particle_actual_distance > max_range_with_tuning)
       probability = 0;
-    else if (particle_actual_distance < particle_theoretical_distance - (min_range_with_tuning))
+    else if (particle_actual_distance < (particle_theoretical_distance - min_range_with_tuning))
       probability = exp(-pow(min_range_with_tuning,2) / pow(ray_std_dev,2));
-    else if (particle_actual_distance > particle_theoretical_distance + (max_range_with_tuning))
+    else if (particle_actual_distance > (particle_theoretical_distance + max_range_with_tuning))
       probability = exp(pow(max_range_with_tuning,2) / pow(ray_std_dev,2));
     else
       probability = exp(pow(delta_distance,2) / pow(ray_std_dev,2));
 
+    std::cout << "Probability: " << probability << std::endl;
+
     particle.weight = particle.weight + probability;
 
+    std::cout << "Particle Weight: " << particle.weight << std::endl;
     // Calculate Max Weight for log calculation
     if(particle.weight > weight_max)
       weight_max = particle.weight;
