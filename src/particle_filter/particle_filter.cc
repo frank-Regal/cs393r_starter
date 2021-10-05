@@ -115,6 +115,7 @@ void ParticleFilter::GetPredictedPointCloud(const Vector2f& loc,
 
   // Reduce the input vectors size to account for every 10th laser scan ray
   int length_of_scan_vec = num_ranges/step_size_of_scan;
+  std::cout << "length_of_scan_vec: " << length_of_scan_vec << std::endl;
   scan.resize(length_of_scan_vec);
 
   // Calcs: Predicted Beginning and End Points of Each Ray within Theoretical Laser Scan
@@ -236,6 +237,7 @@ void ParticleFilter::Update(const vector<float>& ranges,
 
   for(int i = 0; i < predicted_point_cloud_length; i++)
   {
+    //std::cout << "\n\n[Predicted Point Cloud: " << i << "]" << std::endl; //debug
     // Physical Laser Scanner Location is Offset From the Particle Location
     float laser_scanner_loc_x = particle.loc.x() + 0.2*cos(particle.angle);
     float laser_scanner_loc_y = particle.loc.y() + 0.2*sin(particle.angle);
@@ -250,28 +252,42 @@ void ParticleFilter::Update(const vector<float>& ranges,
 
     // Calculating Distance Comparison
     float delta_distance = particle_actual_distance - particle_theoretical_distance;
+    //std::cout << "\nDelta Distance: " << delta_distance << std::endl; //debug
 
     // Function for weighting the probability of particle being in the location found
     if(particle_actual_distance < min_range_with_tuning or particle_actual_distance > max_range_with_tuning)
+    {
       probability = 0;
+      //std::cout << "*Actual was Out Bounds Of Range" << std::endl; //debug
+    }
     else if (particle_actual_distance < (particle_theoretical_distance - min_range_with_tuning))
-      probability = exp(-pow(min_range_with_tuning,2) / pow(ray_std_dev,2));
+    {
+      probability = exp(-(pow(min_range_with_tuning,2) / pow(ray_std_dev,2)));
+      //std::cout << "**Actual Was LESS than Theoretical Distance" << std::endl; //debug
+    }
     else if (particle_actual_distance > (particle_theoretical_distance + max_range_with_tuning))
-      probability = exp(pow(max_range_with_tuning,2) / pow(ray_std_dev,2));
+    {
+      probability = exp(-(pow(max_range_with_tuning,2) / pow(ray_std_dev,2)));
+      //std::cout << "***Actual was GREATER than Theoretical Distance" << std::endl; //debug
+    }
     else
-      probability = exp(pow(delta_distance,2) / pow(ray_std_dev,2));
+    {
+      probability = exp(-(pow(delta_distance,2) / pow(ray_std_dev,2)));
+      //std::cout << "****Actual is in the Guassian" << std::endl; // debug
+    }
 
-    std::cout << "Probability: " << probability << std::endl;
+    //std::cout << "Probability: " << probability << std::endl;
 
-    particle.weight = particle.weight + probability;
+    particle.weight += probability;
 
-    std::cout << "Particle Weight: " << particle.weight << std::endl;
     // Calculate Max Weight for log calculation
-    if(particle.weight > weight_max)
-      weight_max = particle.weight;
+    if(probability > weight_max)
+      weight_max = probability;
   }
-
-  particle.weight = log(particle.weight) - log(weight_max);
+  std::cout << "Particle Weight Max: " << weight_max << std::endl;
+  std::cout << "Particle Weight: " << particle.weight << std::endl;
+  particle.weight = particle.weight/weight_max;
+  std::cout << "Normalized Particle Weights: " << particle.weight << std::endl;
 }
 
 void ParticleFilter::Resample() {
@@ -310,7 +326,7 @@ void ParticleFilter::Resample() {
 
       // get a random number
       float random_num = rng_.UniformRandom(0, total_weight);
-      std::cout << "\n[Iter: " << i << "]\n Random Number: " << random_num << std::endl; // _____________ debug
+      //std::cout << "\n[Iter: " << i << "]\n Random Number: " << random_num << std::endl; // _____________ debug
 
       // loop through each particle weight/bucket
       for (int j {0}; j < input_vec_length; j++)
@@ -375,6 +391,14 @@ void ParticleFilter::ObserveLaser(const vector<float>& ranges,
   for(auto &particle : particles_)
   {
     Update(ranges, range_min, range_max, angle_min, angle_max, &particle);
+    
+    std::cout << "\n\n[PARTICLE VALUES ]"  //debug
+                << "\n x: " << particle.loc.x()
+                << "\n y: " << particle.loc.y()
+                << "\n angle: " << particle.angle
+                << "\n weight: " << particle.weight
+                << std::endl;
+
 
   }
 
@@ -410,32 +434,6 @@ void ParticleFilter::Predict(const Eigen::Vector3d &odom_cur) {
   double del_y = odom_cur(1)-odom_old(1);
   double del_theta = get_angle_diff(odom_cur(2),odom_old(2));
   double del_trans = sqrt(pow(del_x,2) + pow(del_y,2));
-
-
-  /*
-  // Attempt 1 *********************************************************************************************
-  double del_trans = sqrt(pow(del_x,2) + pow(del_y,2)); 
-  // Delta Rotation 1 
-  double del_rot1 = atan2(del_y,del_x) - odom_old(2);
-  // Delta Translation Between Current and Last Odom Position
-  double del_trans = sqrt(pow(del_x,2) + pow(del_y,2));
-  // Delta Rotation 2
-  double del_rot2 = del_theta - del_rot1;
-  
-  // set alpha variance paramaters; set_parameter
-  double a1 {0};
-  double a2 {0};
-  double a3 {0};
-  double a4 {0};
-
-  // get relative motion with variance factored in
-  // CHECK: Should this be minus?
-  double del_rot_1_hat = del_rot1 + rng_.Gaussian(odom_cur(0), sqrt(a1*pow(del_rot1,2) + a2*pow(del_trans,2)) );
-  double del_trans_hat = del_trans + rng_.Gaussian(odom_cur(1), sqrt(a3*pow(del_trans,2) + a4*pow(del_rot1,2) + a4*pow(del_rot2,2)) );
-  double del_rot_2_hat = del_rot2 + rng_.Gaussian(odom_cur(2), sqrt(a1*pow(del_rot2,2) + a2*pow(del_trans,2)) );
-  */
- 
-  // Attempt 2 *********************************************************************************************
   
   // set alpha variance paramaters; set_parameter
   double a1 {0};
@@ -451,13 +449,6 @@ void ParticleFilter::Predict(const Eigen::Vector3d &odom_cur) {
     // Loop through current list of particles and update the particle location vector based on odom readings
     for (int i {0}; i < length_of_particles_vec; i++)
     {
-      /* 
-      // Attempt 1
-      particles_[i].loc.x() = particles_[i].loc.x() + del_trans_hat * cos( particles_[i].angle + del_rot_1_hat );
-      particles_[i].loc.y() = particles_[i].loc.y() + del_trans_hat * sin( particles_[i].angle + del_rot_1_hat );
-      particles_[i].angle = particles_[i].angle + del_rot_1_hat + del_rot_2_hat;
-      */
-
       // Convert to Map Coordinates
       double rotation_angle = get_angle_diff(particles_[i].angle, odom_old(2));
 
@@ -472,22 +463,22 @@ void ParticleFilter::Predict(const Eigen::Vector3d &odom_cur) {
       double del_y_hat = map_frame_del_y + rng_.Gaussian(0, ( a1*map_frame_del_trans + a2*abs(del_theta) )); 
       double del_theta_hat = del_theta + rng_.Gaussian(0, ( a3*map_frame_del_trans + a4*abs(del_theta) )); 
 
-      std::cout << "PARTICLE VALUES (0) = "
-                << "x0: " << particles_[i].loc.x()
-                << " y0: " << particles_[i].loc.y()
-                << " angle0: " << particles_[i].angle
-                << std::endl;
+      //std::cout << "PARTICLE VALUES (0) = "   // debug
+      //          << "x0: " << particles_[i].loc.x()
+      //          << " y0: " << particles_[i].loc.y()
+      //          << " angle0: " << particles_[i].angle
+      //          << std::endl;
       
       // Update Particle Location
       particles_[i].loc.x() += del_x_hat;
       particles_[i].loc.y() += del_y_hat;
       particles_[i].angle += del_theta_hat;
 
-      std::cout << "PARTICLE VALUES (1) = "
-                << "x1: " << particles_[i].loc.x()
-                << " y1: " << particles_[i].loc.y()
-                << " angle1: " << particles_[i].angle
-                << std::endl;
+      //std::cout << "PARTICLE VALUES (1) = "  //debug
+      //          << "x1: " << particles_[i].loc.x()
+      //          << " y1: " << particles_[i].loc.y()
+      //          << " angle1: " << particles_[i].angle
+      //          << std::endl;
     }
 
   }
