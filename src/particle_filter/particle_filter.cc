@@ -95,6 +95,7 @@ void ParticleFilter::GetPredictedPointCloud(const Vector2f& loc,
                                             float angle_max,
                                             vector<Vector2f>* scan_ptr) {
   vector<Vector2f>& scan = *scan_ptr;
+  vector<Vector2f> loc_of_max_distance_ray;
   // Compute what the predicted point cloud would be, if the car was at the pose
   // loc, angle, with the sensor characteristics defined by the provided
   // parameters.
@@ -103,6 +104,8 @@ void ParticleFilter::GetPredictedPointCloud(const Vector2f& loc,
 
   // Note: The returned values must be set using the `scan` variable:
   scan.resize(num_ranges);
+  
+  /*
   // Fill in the entries of scan using array writes, e.g. scan[i] = ...
   for (size_t i = 0; i < scan.size(); ++i) {
     scan[i] = Vector2f(0, 0);
@@ -135,7 +138,79 @@ void ParticleFilter::GetPredictedPointCloud(const Vector2f& loc,
     } else {
       //printf("No intersection\n");
     }
-  }
+    */
+    // ********
+    
+    // set_parameter
+    int step_size_of_scan {10};
+    // Reduce the input vectors size to account for every 10th laser scan ray
+    int length_of_scan_vec = num_ranges/step_size_of_scan;
+    scan.resize(length_of_scan_vec);
+  
+    // build vector of laser scan angles
+    std::vector <double> predicted_scan_angles;
+
+    // Calculations: Predicted Beginning and End Points of Each Ray within Theoretical Laser Scan
+    // Points for Laser Scanner in Space using Distance between baselink and laser scanner on physical robot to be 0.2 meters
+    double laser_scanner_loc_x = loc.x() + 0.2*cos(angle);
+    double laser_scanner_loc_y = loc.y() + 0.2*sin(angle);
+    Eigen::Vector2d laser_scanner_loc(laser_scanner_loc_x,laser_scanner_loc_y);
+
+
+    // Starting Point
+    double parsed_angle = angle+angle_min;
+
+    // fill vector of scan angles
+    for (int i {0}; i < length_of_scan_vec; i++)
+    {
+      parsed_angle += ((angle_max-angle_min)/length_of_scan_vec);
+      predicted_scan_angles.push_back(parsed_angle);
+    }
+
+    // loop through each theoretical scan
+    for (int j {0}; j < length_of_scan_vec; j++)
+    {
+      // Initialize the points of the predicted laser scan rays
+      geometry::line2d laser_ray(1,2,3,4);
+      laser_ray.p0.x() = laser_scanner_loc_x + range_min*cos(predicted_scan_angles[j]);
+      laser_ray.p0.y() = laser_scanner_loc_y + range_min*sin(predicted_scan_angles[j]);
+      laser_ray.p1.x() = laser_scanner_loc_x + range_max*cos(predicted_scan_angles[j]);
+      laser_ray.p1.y() = laser_scanner_loc_y + range_max*sin(predicted_scan_angles[j]);
+      
+      // Fill i-th entry to return vector with the point of the max range
+      scan[j] << laser_ray.p1.x(),
+                 laser_ray.p1.y();
+      
+      double max_distance_of_current_ray = (laser_scanner_loc - scan[j]).norm();
+
+
+      // Loop Through Each Map Lines from Imported Text File to See if Laser Rays Intersect
+      for (size_t k = 0; k < map_.lines.size(); ++k) 
+      {
+        // Assign Map Lines to Variable
+        const line2f map_line = map_.lines[k];
+        
+        // Initialize Return Variable
+        Eigen::Vector2f intersection_point;
+
+        // Compare Lines in Map to Theoretical Laser Rays from Each Particle
+        bool intersects = map_line.Intersection(laser_ray, &intersection_point);
+        if (interests)
+        {
+          // Grab Distance of that intersecting ray
+          double distance_of_intersecting_ray = (intersection_point-laser_scanner_loc).norm;
+
+          // If that distance is smaller than the current max ray distance for this ith scan, set it to the max_distance
+          if ( distance_of_intersecting_ray < max_distance_of_current_ray)
+          {
+            max_distance_of_current_ray = distance_of_intersecting_ray; // max distance of current ray not interesting
+            loc_of_max_distance_ray = intersection_point;
+          }
+        }
+      }
+      // fill with location of the max distance of a non-intersecting ray
+      scan[j] = loc_of_max_distance_ray; 
+    }
 }
 
 void ParticleFilter::Update(const vector<float>& ranges,
