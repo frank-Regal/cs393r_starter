@@ -224,9 +224,9 @@ void ParticleFilter::Update(const vector<float>& ranges,
   double min_dist_tuning = 0.5;
   double max_dist_tuning = 0.5;
 
-  // Adding tuning params for Min and Max Ranges of Physical Laser Scanner
-  float min_range_with_tuning = range_min * min_dist_tuning;
-  float max_range_with_tuning = range_max * max_dist_tuning;
+  // // Adding tuning params for Min and Max Ranges of Physical Laser Scanner
+  // float min_range_with_tuning = range_min + range_min * min_dist_tuning;
+  // float max_range_with_tuning = range_max - range_max * max_dist_tuning;
 
   // Standard deviation of Physical LIDAR System; set_parameter
   double ray_std_dev = 0.125;
@@ -255,21 +255,12 @@ void ParticleFilter::Update(const vector<float>& ranges,
     //std::cout << "\nDelta Distance: " << delta_distance << std::endl; //debug
 
     // Function for weighting the probability of particle being in the location found
-    if(particle_actual_distance < min_range_with_tuning or particle_actual_distance > max_range_with_tuning)
-    {
+    if(particle_actual_distance < range_min or particle_actual_distance > range_max)
       probability = 0;
-      //std::cout << "*Actual was Out Bounds Of Range" << std::endl; //debug
-    }
-    else if (particle_actual_distance < (particle_theoretical_distance - min_range_with_tuning))
-    {
-      probability = exp(-(pow(min_range_with_tuning,2) / pow(ray_std_dev,2)));
-      //std::cout << "**Actual Was LESS than Theoretical Distance" << std::endl; //debug
-    }
-    else if (particle_actual_distance > (particle_theoretical_distance + max_range_with_tuning))
-    {
-      probability = exp(-(pow(max_range_with_tuning,2) / pow(ray_std_dev,2)));
-      //std::cout << "***Actual was GREATER than Theoretical Distance" << std::endl; //debug
-    }
+    else if (particle_actual_distance < (particle_theoretical_distance - min_dist_tuning))
+      probability = exp(-pow(min_dist_tuning,2) / pow(ray_std_dev,2));
+    else if (particle_actual_distance > (particle_theoretical_distance + max_dist_tuning))
+      probability = exp(pow(max_dist_tuning,2) / pow(ray_std_dev,2));
     else
     {
       probability = exp(-(pow(delta_distance,2) / pow(ray_std_dev,2)));
