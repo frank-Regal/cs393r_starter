@@ -301,6 +301,7 @@ void ParticleFilter::Resample() {
   std::vector <Particle> reduced_particle_vec; // return vector (vector of the kept particles)
   double weight_sum {0};                       // comparison variable 
   double total_weight {0};                     // total weight of all particles
+  double max_weight {0};
   int k {0};                                   // edge case variable
 
   
@@ -311,21 +312,21 @@ void ParticleFilter::Resample() {
   //  a. Compute Sum of All Weights
   for (auto get_particle: particles_)
   {
-      total_weight += get_particle.weight;
-      std::cout << "total_weight: " << total_weight << std::endl;
+      if (get_particle.weight > max_weight)
+        max_weight = get_particle.weight;
+      
   }
+  std::cout << "max_weight: " << max_weight << std::endl;
 
-  //  b. Repopulate the weights with normalized weights
+  //  b. Repopulate the weights with normalized weights (reference 51:00 Min in Lecture 2021.09.22)
   for (int k {0}; k < input_vec_length; k++)
   {
     std::cout << "Unormalized Particles: " << particles_[k].weight << std::endl;
-    particles_[k].weight = particles_[k].weight/total_weight;
+    particles_[k].weight = abs(particles_[k].weight - max_weight);
     std::cout << "Normalized Particles: " << particles_[k].weight << std::endl;
   }
 
-  
   // Step 2: Compute Sum of Normalized Weights
-  total_weight = 0;
   // Compute Sum of Particle Weights to Get Upper Container Bound
   for (auto get_particle: particles_)
   {
