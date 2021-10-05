@@ -115,7 +115,7 @@ void ParticleFilter::GetPredictedPointCloud(const Vector2f& loc,
 
   // Reduce the input vectors size to account for every 10th laser scan ray
   int length_of_scan_vec = num_ranges/step_size_of_scan;
-  std::cout << "length_of_scan_vec: " << length_of_scan_vec << std::endl;
+  //std::cout << "length_of_scan_vec: " << length_of_scan_vec << std::endl; //debug
   scan.resize(length_of_scan_vec);
 
   // Calcs: Predicted Beginning and End Points of Each Ray within Theoretical Laser Scan
@@ -221,8 +221,8 @@ void ParticleFilter::Update(const vector<float>& ranges,
     resized_ranges[i] = ranges[lidar_ray_step_size*i];
 
   // Tuning parameters for the minimum and maximum distances of the laser scanner; set_parameter
-  double min_dist_tuning = 0.5;
-  double max_dist_tuning = 0.5;
+  double dshort = 0.5;
+  double dlong = 0.5;
 
   // // Adding tuning params for Min and Max Ranges of Physical Laser Scanner
   // float min_range_with_tuning = range_min + range_min * min_dist_tuning;
@@ -232,9 +232,11 @@ void ParticleFilter::Update(const vector<float>& ranges,
   double ray_std_dev = 0.125;
 
   // Reset variables between each point cloud
-  float probability = 1;
-  float weight_max = 0;
+  float weight {0};
+  float max_weight {0};
+  float total_weight {0};
 
+  // Calculate Weight for Particle
   for(int i = 0; i < predicted_point_cloud_length; i++)
   {
     //std::cout << "\n\n[Predicted Point Cloud: " << i << "]" << std::endl; //debug
@@ -256,29 +258,29 @@ void ParticleFilter::Update(const vector<float>& ranges,
 
     // Function for weighting the probability of particle being in the location found
     if(particle_actual_distance < range_min or particle_actual_distance > range_max)
-      probability = 0;
-    else if (particle_actual_distance < (particle_theoretical_distance - min_dist_tuning))
-      probability = exp(-pow(min_dist_tuning,2) / pow(ray_std_dev,2));
-    else if (particle_actual_distance > (particle_theoretical_distance + max_dist_tuning))
-      probability = exp(pow(max_dist_tuning,2) / pow(ray_std_dev,2));
+      weight = 0;
+    else if (particle_actual_distance < (particle_theoretical_distance - dshort))
+      weight = exp(-(pow(dshort,2) / pow(ray_std_dev,2)));
+    else if (particle_actual_distance > (particle_theoretical_distance + dlong))
+      weight = exp(-(pow(dlong,2) / pow(ray_std_dev,2)));
     else
     {
-      probability = exp(-(pow(delta_distance,2) / pow(ray_std_dev,2)));
+      weight = exp(-(pow(delta_distance,2) / pow(ray_std_dev,2)));
       //std::cout << "****Actual is in the Guassian" << std::endl; // debug
     }
-
-    //std::cout << "Probability: " << probability << std::endl;
-
-    particle.weight += probability;
+    // Update Total Probability for this particle
+    //std::cout << "weight: " << weight << std::endl; //debug
+    total_weight += weight;
 
     // Calculate Max Weight for log calculation
-    if(probability > weight_max)
-      weight_max = probability;
+    if(weight > max_weight)
+      max_weight = weight;
   }
-  std::cout << "Particle Weight Max: " << weight_max << std::endl;
-  std::cout << "Particle Weight: " << particle.weight << std::endl;
-  particle.weight = particle.weight/weight_max;
-  std::cout << "Normalized Particle Weights: " << particle.weight << std::endl;
+  particle.weight = total_weight;
+  //std::cout << "Particle Weight Max: " << max_weight << std::endl; // debug
+  //std::cout << "Particle Weight Total: " << particle.weight << std::endl; //debug
+  //particle.weight = particle.weight/max_weight;
+  //std::cout << "Normalized Particle Weights: " << particle.weight << std::endl; // debug
 }
 
 void ParticleFilter::Resample() {
@@ -299,16 +301,39 @@ void ParticleFilter::Resample() {
   std::vector <Particle> reduced_particle_vec; // return vector (vector of the kept particles)
   double weight_sum {0};                       // comparison variable 
   double total_weight {0};                     // total weight of all particles
-  //double random_num {0};                       // normal random number variable
   int k {0};                                   // edge case variable
 
+  
   // Get Length of Input Vector for Looping
   int input_vec_length = particles_.size();
 
+  // Step 1: Normalize Weights
+  //  a. Compute Sum of All Weights
+  for (auto get_particle: particles_)
+  {
+      total_weight += get_particle.weight;
+      std::cout << "total_weight: " << total_weight << std::endl;
+  }
+
+  //  b. Repopulate the weights with normalized weights
+  for (int k {0}; k < input_vec_length; k++)
+  {
+    std::cout << "Unormalized Particles: " << particles_[k].weight << std::endl;
+    particles_[k].weight = particles_[k].weight/total_weight;
+    std::cout << "Normalized Particles: " << particles_[k].weight << std::endl;
+  }
+
+  
+  // Step 2: Compute Sum of Normalized Weights
+  total_weight = 0;
   // Compute Sum of Particle Weights to Get Upper Container Bound
   for (auto get_particle: particles_)
+  {
       total_weight += get_particle.weight;
-  
+      std::cout << "total_weight: " << total_weight << std::endl;
+  }
+
+  // Step 3: Loop through each weight and resample
   // Main Loop; RESAMPLE
   for (int i {0}; i < num_of_resamples; i++)
   {   
