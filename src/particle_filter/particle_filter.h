@@ -86,6 +86,8 @@ class ParticleFilter {
                               float angle_max,
                               std::vector<Eigen::Vector2f>* scan);
 
+ double get_angle_diff(double a, double b);
+  
  private:
 
   // List of particles being tracked.

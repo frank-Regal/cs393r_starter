@@ -200,7 +200,12 @@ void OdometryCallback(const nav_msgs::Odometry& msg) {
   // Update Best Location of Robot
   Vector2f robot_loc(0, 0);
   float robot_angle(0);
+  
   particle_filter_.GetLocation(&robot_loc, &robot_angle);
+
+  std::cout << "robot_loc, x: " << robot_loc.x()
+            << "\nrobot_loc, y: " << robot_loc.y()
+            << "\nrobot_angle: " << robot_angle << std::endl;
 
   amrl_msgs::Localization2DMsg localization_msg;
   localization_msg.pose.x = robot_loc.x();
@@ -260,7 +265,8 @@ int main(int argc, char** argv) {
   ros::NodeHandle n;
   InitializeMsgs();
 
-  PublishVisualization();
+  std::cout << "main called" << std::endl;
+  //PublishVisualization();
 
   visualization_publisher_ =
       n.advertise<VisualizationMsg>("visualization", 1);
