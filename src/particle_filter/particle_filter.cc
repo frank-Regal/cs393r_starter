@@ -176,10 +176,14 @@ void ParticleFilter::Update(const vector<float>& ranges,
 
   for(int i = 0; i < predicted_point_cloud_length; i++)
   {
+    // Laser scanner location is offset from the particle location
     float laser_scanner_loc_x = particle.loc.x() + 0.2*cos(particle.angle);
     float laser_scanner_loc_y = particle.loc.y() + 0.2*sin(particle.angle);
+
+    // Distance laser scanner found to be from obstacle (actual distance)
     float particle_actual_distance = resized_ranges[i];
 
+    // Calculate distance between the laser scanner and the returned point cloud location (theoretical distance)
     float theoretical_dist_x = predicted_point_cloud[i].x() - laser_scanner_loc_x;
     float theoretical_dist_y = predicted_point_cloud[i].y() - laser_scanner_loc_y;
     float particle_theoretical_distance = sqrt(pow(theoretical_dist_x, 2)+pow(theoretical_dist_y, 2));
@@ -188,6 +192,7 @@ void ParticleFilter::Update(const vector<float>& ranges,
     float max_range_with_tuning = range_max * max_dist_tuning;
     float delta_distance = particle_actual_distance - particle_theoretical_distance;
 
+    // Function for weighting the probability of particle being in the location found
     if(particle_actual_distance < range_min or particle_actual_distance > range_max)
       particle.weight = 0;
     else if (particle_actual_distance < particle_theoretical_distance - (min_range_with_tuning))
