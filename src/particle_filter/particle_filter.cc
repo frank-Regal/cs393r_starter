@@ -145,6 +145,54 @@ void ParticleFilter::Update(const vector<float>& ranges,
   // observations for each particle, and assign weights to the particles based
   // on the observation likelihood computed by relating the observation to the
   // predicted point cloud.
+
+  Particle& particle = *p_ptr;
+
+  // Initialize point cloud vector
+  vector<Vector2f> predicted_point_cloud;
+  // Fill point cloud vector
+  GetPredictedPointCloud(particle.loc, particle.angle, 
+                         ranges.size(), range_min, range_max, 
+                         angle_min, angle_max, &predicted_point_cloud);
+
+  // Resize lidar scan range
+  vector<float> resized_ranges(predicted_point_cloud.size());
+  int lidar_ray_step_size = ranges.size() / predicted_point_cloud.size();
+
+  int predicted_point_cloud_length = predicted_point_cloud.size();
+
+  for(int i = 0; i < predicted_point_cloud_length; i++)
+    resized_ranges[i] = ranges[lidar_ray_step_size*i];
+
+  // Tuning parameters for the minimum and maximum distances of the laser scanner
+  double min_dist_tuning = 0.5;
+  double max_dist_tuning = 0.5;
+  // Standard deviation of LIDAR
+  double ray_std_dev = 0.125;
+
+  for(int i = 0; i < predicted_point_cloud_length; i++)
+  {
+    float laser_scanner_loc_x = particle.loc.x() + 0.2*cos(particle.angle);
+    float laser_scanner_loc_y = particle.loc.y() + 0.2*sin(particle.angle);
+    float particle_actual_distance = resized_ranges[i];
+
+    float theoretical_dist_x = predicted_point_cloud[i].x() - laser_scanner_loc_x;
+    float theoretical_dist_y = predicted_point_cloud[i].y() - laser_scanner_loc_y;
+    float particle_theoretical_distance = sqrt(pow(theoretical_dist_x, 2)+pow(theoretical_dist_y, 2));
+
+    float min_range_with_tuning = range_min * min_dist_tuning;
+    float max_range_with_tuning = range_max * max_dist_tuning;
+    float delta_distance = particle_actual_distance - particle_theoretical_distance;
+
+    if(particle_actual_distance < range_min or particle_actual_distance > range_max)
+      particle.weight = 0;
+    else if (particle_actual_distance < particle_theoretical_distance - (min_range_with_tuning))
+      particle.weight = exp(-pow(min_range_with_tuning,2) / pow(ray_std_dev,2));
+    else if (particle_actual_distance > particle_theoretical_distance + (max_range_with_tuning))
+      particle.weight = exp(pow(max_range_with_tuning,2) / pow(ray_std_dev,2));
+    else
+      particle.weight = exp(pow(delta_distance,2) / pow(ray_std_dev,2));
+  }
 }
 
 void ParticleFilter::Resample() {
@@ -322,6 +370,7 @@ void ParticleFilter::Predict(const Eigen::Vector3d &odom_cur) {
 
       // Rotate Previous Odom about Last Known Particle Location
       double map_frame_del_x = del_x*cos(rotation_angle) - del_y*sin(rotation_angle);
+
       double map_frame_del_y = del_x*cos(rotation_angle) + del_y*sin(rotation_angle);
       double map_frame_del_trans = sqrt(pow(map_frame_del_x,2) + pow(map_frame_del_y,2));
 
