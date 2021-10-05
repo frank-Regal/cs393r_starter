@@ -51,6 +51,10 @@ using vector_map::VectorMap;
 
 DEFINE_double(num_particles, 50, "Number of particles");
 
+namespace {
+  int updates_done = 0;
+}
+
 namespace particle_filter {
 
 config_reader::ConfigReader config_reader_({"config/particle_filter.lua"});
@@ -293,6 +297,20 @@ void ParticleFilter::ObserveLaser(const vector<float>& ranges,
                                   float angle_max) {
   // A new laser scan observation is available (in the laser frame)
   // Call the Update and Resample steps as necessary.
+  for(auto &particle : particles_)
+  {
+    Update(ranges, range_min, range_max, angle_min, angle_max, &particle);
+
+  }
+
+  //TODO: set_parameter for number of updates done between each resampling
+  if(updates_done > 10)
+  {
+    Resample();
+    updates_done = 0;
+  }
+  else 
+    updates_done++;
 }
 
 void ParticleFilter::Predict(const Eigen::Vector3d &odom_cur) {
@@ -398,13 +416,14 @@ void ParticleFilter::Predict(const Eigen::Vector3d &odom_cur) {
     }
 
   }
-
-  // Set current odom values to previous values for next call to predict
+  else
+  {// Set current odom values to previous values for next call to predict
   odom_old(0) = odom_cur(0); // x odom
   odom_old(1) = odom_cur(1); // y odom
   odom_old(2) = odom_cur(2); // angle odom
   odom_initialized_ = true;
-
+  updates_done = 0;
+  }
 }
 
 void ParticleFilter::Initialize(const string& map_file,
