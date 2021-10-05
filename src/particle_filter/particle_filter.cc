@@ -174,6 +174,10 @@ void ParticleFilter::Update(const vector<float>& ranges,
   // Standard deviation of LIDAR
   double ray_std_dev = 0.125;
 
+  // Reset variables between each point cloud
+  float probability = 1;
+  float weight_max = 0;
+
   for(int i = 0; i < predicted_point_cloud_length; i++)
   {
     // Laser scanner location is offset from the particle location
@@ -194,14 +198,22 @@ void ParticleFilter::Update(const vector<float>& ranges,
 
     // Function for weighting the probability of particle being in the location found
     if(particle_actual_distance < range_min or particle_actual_distance > range_max)
-      particle.weight = 0;
+      probability = 0;
     else if (particle_actual_distance < particle_theoretical_distance - (min_range_with_tuning))
-      particle.weight = exp(-pow(min_range_with_tuning,2) / pow(ray_std_dev,2));
+      probability = exp(-pow(min_range_with_tuning,2) / pow(ray_std_dev,2));
     else if (particle_actual_distance > particle_theoretical_distance + (max_range_with_tuning))
-      particle.weight = exp(pow(max_range_with_tuning,2) / pow(ray_std_dev,2));
+      probability = exp(pow(max_range_with_tuning,2) / pow(ray_std_dev,2));
     else
-      particle.weight = exp(pow(delta_distance,2) / pow(ray_std_dev,2));
+      probability = exp(pow(delta_distance,2) / pow(ray_std_dev,2));
+
+    particle.weight = particle.weight + probability;
+
+    // Calculate Max Weight for log calculation
+    if(particle.weight > weight_max)
+      weight_max = particle.weight;
   }
+
+  particle.weight = log(particle.weight) - log(weight_max);
 }
 
 void ParticleFilter::Resample() {
