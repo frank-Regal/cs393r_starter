@@ -52,7 +52,11 @@ using vector_map::VectorMap;
 DEFINE_double(num_particles, 50, "Number of particles");
 
 namespace {
-  int updates_done = 0;
+  int updates_done {0};
+}
+
+namespace {
+  int predict_steps {0};
 }
 
 namespace particle_filter {
@@ -229,7 +233,7 @@ void ParticleFilter::Update(const vector<float>& ranges,
   // float max_range_with_tuning = range_max - range_max * max_dist_tuning;
 
   // Standard deviation of Physical LIDAR System; set_parameter
-  double ray_std_dev = 0.125;
+  double ray_std_dev = 0.1;
 
   // Reset variables between each point cloud
   float weight {0};
@@ -295,7 +299,7 @@ void ParticleFilter::Resample() {
   // particles_ = new_particles;
 
   // Predefine the Number of Resamples; set_parameter
-  int num_of_resamples {200};
+  int num_of_resamples {30};
 
   // Initializations
   std::vector <Particle> reduced_particle_vec; // return vector (vector of the kept particles)
@@ -386,10 +390,10 @@ void ParticleFilter::Resample() {
 
       // Erase existing particles_ vector and fill with resampled particle vector (reduced_particle_vec)
       // CHECK 
-      particles_.erase(particles_.begin(), particles_.end());
-      particles_ = reduced_particle_vec;
+      //particles_.erase(particles_.begin(), particles_.end());
+      //particles_ = reduced_particle_vec;
   }
-
+  particles_.erase(particles_.begin(), particles_.end());
   particles_ = reduced_particle_vec;
   // You will need to use the uniform random number generator provided. For
   // example, to generate a random number between 0 and 1:
@@ -405,31 +409,37 @@ void ParticleFilter::ObserveLaser(const vector<float>& ranges,
                                   float angle_max) {
   // A new laser scan observation is available (in the laser frame)
   // Call the Update and Resample steps as necessary.
-  int iter = 0;
-  for(auto &particle : particles_)
+
+  if (predict_steps == 0)
   {
-    std::cout << "Called Update; Num: " << iter << std::endl;
-    Update(ranges, range_min, range_max, angle_min, angle_max, &particle);
-    iter++;
-    // std::cout << "\n\n[PARTICLE VALUES ]"  //debug
-    //             << "\n x: " << particle.loc.x()
-    //             << "\n y: " << particle.loc.y()
-    //             << "\n angle: " << particle.angle
-    //             << "\n weight: " << particle.weight
-    //             << std::endl;
-
-
+    std::cout << "Called Update" << std::endl;
+    std::cout << "updates_done: " << updates_done << std::endl;
+    for(auto &particle : particles_)
+    {
+      Update(ranges, range_min, range_max, angle_min, angle_max, &particle);
+      // std::cout << "\n\n[PARTICLE VALUES ]"  //debug
+      //             << "\n x: " << particle.loc.x()
+      //             << "\n y: " << particle.loc.y()
+      //             << "\n angle: " << particle.angle
+      //             << "\n weight: " << particle.weight
+      //             << std::endl;
+    }
+    predict_steps = 1;
+    updates_done++;
   }
   //TODO: set_parameter for number of updates done between each resampling
-  if(updates_done > 20)
+  if(updates_done == 3)
   {
-    std::cout << "called resample" << std::endl;
+    std::cout << "***called resample" << std::endl;
     Resample();
     updates_done = 0;
-  }
-  else 
-  {
-    updates_done++;
+    predict_steps = 0;
+    // std::cout << "\n\n[PARTICLE VALUES ]"  //debug
+    //           << "\n x: " << particle.loc.x()
+    //           << "\n y: " << particle.loc.y()
+    //           << "\n angle: " << particle.angle
+    //           << "\n weight: " << particle.weight
+    //           << std::endl;
   }
 }
 
@@ -463,8 +473,10 @@ void ParticleFilter::Predict(const Eigen::Vector3d &odom_cur) {
     double del_trans = sqrt(pow(del_y,2) + pow(del_x,2));
     double del_rot_2 = get_angle_diff(odom_cur(2),odom_old(2)) - del_rot_1;
     int particle_vector_length = particles_.size();
-
-  if (odom_initialized_ and (del_trans > 0.025) and (del_trans < 1)  and odom_cur(2) < M_PI/2 and odom_cur(2) > -M_PI/2 )
+  std::cout << "predict_steps: " << predict_steps << std::endl;
+  if (odom_initialized_ and (del_trans < 1)  and odom_cur(2) < M_PI/2 and odom_cur(2) > -M_PI/2 and predict_steps == 5)
+  {
+    std::cout << "\n\nPREDICT CALLED" << std::endl;
     for (int i {0}; i < particle_vector_length; i++) 
     {   
     // Calculate Variance
@@ -485,7 +497,9 @@ void ParticleFilter::Predict(const Eigen::Vector3d &odom_cur) {
     odom_old(0) = odom_cur(0); // x odom
     odom_old(1) = odom_cur(1); // y odom
     odom_old(2) = odom_cur(2); // angle odom
+    predict_steps = 0;
     }
+  }
     
     // ****************************************************************************************************
     /*
@@ -533,7 +547,7 @@ void ParticleFilter::Predict(const Eigen::Vector3d &odom_cur) {
     odom_old(1) = odom_cur(1); // y odom
     odom_old(2) = odom_cur(2); // angle odom
     odom_initialized_ = true;
-    updates_done = 0;
+    predict_steps++;
   }
 }
 
