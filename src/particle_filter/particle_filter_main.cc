@@ -203,9 +203,9 @@ void OdometryCallback(const nav_msgs::Odometry& msg) {
   
   particle_filter_.GetLocation(&robot_loc, &robot_angle);
 
-  std::cout << "robot_loc, x: " << robot_loc.x()
-            << "\nrobot_loc, y: " << robot_loc.y()
-            << "\nrobot_angle: " << robot_angle << std::endl;
+  // std::cout << "robot_loc, x: " << robot_loc.x()
+  //           << "\nrobot_loc, y: " << robot_loc.y()
+  //           << "\nrobot_angle: " << robot_angle << std::endl;
 
   amrl_msgs::Localization2DMsg localization_msg;
   localization_msg.pose.x = robot_loc.x();

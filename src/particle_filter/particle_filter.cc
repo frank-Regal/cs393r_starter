@@ -295,7 +295,7 @@ void ParticleFilter::Resample() {
   // particles_ = new_particles;
 
   // Predefine the Number of Resamples; set_parameter
-  int num_of_resamples {100};
+  int num_of_resamples {200};
 
   // Initializations
   std::vector <Particle> reduced_particle_vec; // return vector (vector of the kept particles)
@@ -316,14 +316,14 @@ void ParticleFilter::Resample() {
         max_weight = get_particle.weight;
       
   }
-  std::cout << "max_weight: " << max_weight << std::endl;
+  //std::cout << "max_weight: " << max_weight << std::endl;
 
   //  b. Repopulate the weights with normalized weights (reference 51:00 Min in Lecture 2021.09.22)
   for (int k {0}; k < input_vec_length; k++)
   {
-    std::cout << "Unormalized Particles: " << particles_[k].weight << std::endl;
+    //std::cout << "Unormalized Particles: " << particles_[k].weight << std::endl;
     particles_[k].weight = abs(particles_[k].weight - max_weight);
-    std::cout << "Normalized Particles: " << particles_[k].weight << std::endl;
+    //std::cout << "Normalized Particles: " << particles_[k].weight << std::endl;
   }
 
   // Step 2: Compute Sum of Normalized Weights
@@ -331,7 +331,7 @@ void ParticleFilter::Resample() {
   for (auto get_particle: particles_)
   {
       total_weight += get_particle.weight;
-      std::cout << "total_weight: " << total_weight << std::endl;
+      //std::cout << "total_weight: " << total_weight << std::endl;
   }
 
   // Step 3: Loop through each weight and resample
@@ -405,28 +405,32 @@ void ParticleFilter::ObserveLaser(const vector<float>& ranges,
                                   float angle_max) {
   // A new laser scan observation is available (in the laser frame)
   // Call the Update and Resample steps as necessary.
+  int iter = 0;
   for(auto &particle : particles_)
   {
+    std::cout << "Called Update; Num: " << iter << std::endl;
     Update(ranges, range_min, range_max, angle_min, angle_max, &particle);
-    
-    std::cout << "\n\n[PARTICLE VALUES ]"  //debug
-                << "\n x: " << particle.loc.x()
-                << "\n y: " << particle.loc.y()
-                << "\n angle: " << particle.angle
-                << "\n weight: " << particle.weight
-                << std::endl;
+    iter++;
+    // std::cout << "\n\n[PARTICLE VALUES ]"  //debug
+    //             << "\n x: " << particle.loc.x()
+    //             << "\n y: " << particle.loc.y()
+    //             << "\n angle: " << particle.angle
+    //             << "\n weight: " << particle.weight
+    //             << std::endl;
 
 
   }
-
   //TODO: set_parameter for number of updates done between each resampling
-  if(updates_done > 10)
+  if(updates_done > 20)
   {
+    std::cout << "called resample" << std::endl;
     Resample();
     updates_done = 0;
   }
   else 
+  {
     updates_done++;
+  }
 }
 
 void ParticleFilter::Predict(const Eigen::Vector3d &odom_cur) {
@@ -438,31 +442,54 @@ void ParticleFilter::Predict(const Eigen::Vector3d &odom_cur) {
   // Reference: Table 5.6 in Sebastian Thrun, Wolfram Bugard & Dieter Fox
   // Calculate Difference Between New and Old Odom Readings
 
-  std::cout << "ODOM READINGS"
-            << "\n cur x: " << odom_cur(0)
-            << "\n cur y: " << odom_cur(1)
-            << "\n cur t: " << odom_cur(2)
-            << "\n old x: " << odom_old(0)
-            << "\n old y: " << odom_old(1)
-            << "\n old t: " << odom_old(2) << std::endl;
+  // std::cout << "ODOM READINGS"
+  //           << "\n cur x: " << odom_cur(0)
+  //           << "\n cur y: " << odom_cur(1)
+  //           << "\n cur t: " << odom_cur(2)
+  //           << "\n old x: " << odom_old(0)
+  //           << "\n old y: " << odom_old(1)
+  //           << "\n old t: " << odom_old(2) << std::endl;
 
-  
-  double del_x = odom_cur(0)-odom_old(0);
-  double del_y = odom_cur(1)-odom_old(1);
-  double del_theta = get_angle_diff(odom_cur(2),odom_old(2));
-  double del_trans = sqrt(pow(del_x,2) + pow(del_y,2));
-  
-  // set alpha variance paramaters; set_parameter
-  double a1 {0};
-  double a2 {0};
-  double a3 {0};
-  double a4 {0};
+    double a1 = 0.08;
+    double a2 = 0.01;
+    double a3 = 0.1;
+    double a4 = 0.1;
 
-  // Get Total Length of particle vector
-  int length_of_particles_vec = particles_.size();
-  if (odom_initialized_ and del_trans < 1)
-  {
-    std::cout << "odom initialized" << std::endl;
+    double del_x = odom_cur(0)-odom_old(0);
+    double del_y = odom_cur(1)-odom_old(1);
+
+    // pow pow
+    double del_rot_1 = get_angle_diff(atan2((odom_cur(1)-odom_old(1)),(odom_cur(0)-odom_old(0))),odom_old(2));
+    double del_trans = sqrt(pow(del_y,2) + pow(del_x,2));
+    double del_rot_2 = get_angle_diff(odom_cur(2),odom_old(2)) - del_rot_1;
+    int particle_vector_length = particles_.size();
+
+  if (odom_initialized_ and (del_trans > 0.025) and (del_trans < 1)  and odom_cur(2) < M_PI/2 and odom_cur(2) > -M_PI/2 )
+    for (int i {0}; i < particle_vector_length; i++) 
+    {   
+    // Calculate Variance
+    double rot1_hat_var = rng_.Gaussian(0,(a1*pow(del_rot_1,2) + a2*pow(del_trans,2)));
+    double trans_hat_var = rng_.Gaussian(0,(a3*pow(del_trans,2)+a4*pow(del_rot_1,2)+a4*pow(del_rot_2,2)));
+    double rot2_hat_var = rng_.Gaussian(0,(a1*pow(del_rot_1,2) + a2*pow(del_trans,2)));
+    
+    // Relative Odometry with some Variance
+    double del_rot_1_hat = get_angle_diff(del_rot_1,rot1_hat_var);
+    double del_trans_hat = del_trans - trans_hat_var;
+    double del_rot_2_hat = get_angle_diff(del_rot_2,rot2_hat_var);
+    
+    // Predicted State_t
+    particles_[i].loc.x() = particles_[i].loc.x() + del_trans_hat*cos(particles_[i].angle+ del_rot_1_hat);
+    particles_[i].loc.y() = particles_[i].loc.y() + del_trans_hat*sin(particles_[i].angle + del_rot_1_hat);
+    particles_[i].angle = particles_[i].angle + del_rot_1_hat + del_rot_2_hat;
+
+    odom_old(0) = odom_cur(0); // x odom
+    odom_old(1) = odom_cur(1); // y odom
+    odom_old(2) = odom_cur(2); // angle odom
+    }
+    
+    // ****************************************************************************************************
+    /*
+    //std::cout << "odom initialized" << std::endl;
     // Loop through current list of particles and update the particle location vector based on odom readings
     for (int i {0}; i < length_of_particles_vec; i++)
     {
@@ -471,7 +498,6 @@ void ParticleFilter::Predict(const Eigen::Vector3d &odom_cur) {
 
       // Rotate Previous Odom about Last Known Particle Location
       double map_frame_del_x = del_x*cos(rotation_angle) - del_y*sin(rotation_angle);
-
       double map_frame_del_y = del_x*cos(rotation_angle) + del_y*sin(rotation_angle);
       double map_frame_del_trans = sqrt(pow(map_frame_del_x,2) + pow(map_frame_del_y,2));
 
@@ -496,16 +522,18 @@ void ParticleFilter::Predict(const Eigen::Vector3d &odom_cur) {
       //          << " y1: " << particles_[i].loc.y()
       //          << " angle1: " << particles_[i].angle
       //          << std::endl;
-    }
 
-  }
+    }
+    */
+    // *********************************************************************************************
   else
-  {// Set current odom values to previous values for next call to predict
-  odom_old(0) = odom_cur(0); // x odom
-  odom_old(1) = odom_cur(1); // y odom
-  odom_old(2) = odom_cur(2); // angle odom
-  odom_initialized_ = true;
-  updates_done = 0;
+  {
+    // Set current odom values to previous values for next call to predict
+    odom_old(0) = odom_cur(0); // x odom
+    odom_old(1) = odom_cur(1); // y odom
+    odom_old(2) = odom_cur(2); // angle odom
+    odom_initialized_ = true;
+    updates_done = 0;
   }
 }
 
@@ -543,8 +571,8 @@ void ParticleFilter::GetLocation(Eigen::Vector2f* loc_ptr,
   // Get Total Length of Input Vector
     int vector_length = particles_.size();
     
-    if (vector_length == 0)
-      vector_length =1;
+    //if (vector_length == 0)
+    //  vector_length =1;
 
     //std::cout << "Get Location Called" << std::endl;
 
