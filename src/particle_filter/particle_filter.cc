@@ -84,7 +84,8 @@ ParticleFilter::ParticleFilter() :
     odom_old(0,0,0),
     prev_odom_loc_(0, 0), // not needed CHECK
     prev_odom_angle_(0),  // not needed CHECK
-    odom_initialized_(false) {}
+    odom_initialized_(false),
+    predict_step_done_(false) {}
 
 void ParticleFilter::GetParticles(vector<Particle>* particles) const {
   *particles = particles_;
@@ -433,7 +434,7 @@ void ParticleFilter::ObserveLaser(const vector<float>& ranges,
     std::cout << "***called resample" << std::endl;
     Resample();
     updates_done = 0;
-    predict_steps = 0;
+    predict_steps = 1;
     // std::cout << "\n\n[PARTICLE VALUES ]"  //debug
     //           << "\n x: " << particle.loc.x()
     //           << "\n y: " << particle.loc.y()
@@ -467,38 +468,42 @@ void ParticleFilter::Predict(const Eigen::Vector3d &odom_cur) {
 
     double del_x = odom_cur(0)-odom_old(0);
     double del_y = odom_cur(1)-odom_old(1);
+    double del_rot = odom_cur(2)-odom_old(2);
 
     // pow pow
     double del_rot_1 = get_angle_diff(atan2((odom_cur(1)-odom_old(1)),(odom_cur(0)-odom_old(0))),odom_old(2));
     double del_trans = sqrt(pow(del_y,2) + pow(del_x,2));
     double del_rot_2 = get_angle_diff(odom_cur(2),odom_old(2)) - del_rot_1;
     int particle_vector_length = particles_.size();
-  std::cout << "predict_steps: " << predict_steps << std::endl;
-  if (odom_initialized_ and (del_trans < 1)  and odom_cur(2) < M_PI/2 and odom_cur(2) > -M_PI/2 and predict_steps == 5)
+
+  if (odom_initialized_ == true and del_trans != 0 and del_trans < 1 and del_rot < M_PI/2 and del_rot > -M_PI/2 and predict_steps >= 5)
   {
     std::cout << "\n\nPREDICT CALLED" << std::endl;
     for (int i {0}; i < particle_vector_length; i++) 
     {   
-    // Calculate Variance
-    double rot1_hat_var = rng_.Gaussian(0,(a1*pow(del_rot_1,2) + a2*pow(del_trans,2)));
-    double trans_hat_var = rng_.Gaussian(0,(a3*pow(del_trans,2)+a4*pow(del_rot_1,2)+a4*pow(del_rot_2,2)));
-    double rot2_hat_var = rng_.Gaussian(0,(a1*pow(del_rot_1,2) + a2*pow(del_trans,2)));
-    
-    // Relative Odometry with some Variance
-    double del_rot_1_hat = get_angle_diff(del_rot_1,rot1_hat_var);
-    double del_trans_hat = del_trans - trans_hat_var;
-    double del_rot_2_hat = get_angle_diff(del_rot_2,rot2_hat_var);
-    
-    // Predicted State_t
-    particles_[i].loc.x() = particles_[i].loc.x() + del_trans_hat*cos(particles_[i].angle+ del_rot_1_hat);
-    particles_[i].loc.y() = particles_[i].loc.y() + del_trans_hat*sin(particles_[i].angle + del_rot_1_hat);
-    particles_[i].angle = particles_[i].angle + del_rot_1_hat + del_rot_2_hat;
+      // Calculate Variance
+      double rot1_hat_var = rng_.Gaussian(0,(a1*pow(del_rot_1,2) + a2*pow(del_trans,2)));
+      double trans_hat_var = rng_.Gaussian(0,(a3*pow(del_trans,2)+a4*pow(del_rot_1,2)+a4*pow(del_rot_2,2)));
+      double rot2_hat_var = rng_.Gaussian(0,(a1*pow(del_rot_1,2) + a2*pow(del_trans,2)));
 
-    odom_old(0) = odom_cur(0); // x odom
-    odom_old(1) = odom_cur(1); // y odom
-    odom_old(2) = odom_cur(2); // angle odom
-    predict_steps = 0;
+      // Relative Odometry with some Variance
+      double del_rot_1_hat = get_angle_diff(del_rot_1,rot1_hat_var);
+      double del_trans_hat = del_trans - trans_hat_var;
+      double del_rot_2_hat = get_angle_diff(del_rot_2,rot2_hat_var);
+
+      // Predicted State_t
+      particles_[i].loc.x() = particles_[i].loc.x() + del_trans_hat*cos(particles_[i].angle+ del_rot_1_hat);
+      particles_[i].loc.y() = particles_[i].loc.y() + del_trans_hat*sin(particles_[i].angle + del_rot_1_hat);
+      particles_[i].angle = particles_[i].angle + del_rot_1_hat + del_rot_2_hat;
+
+      odom_old(0) = odom_cur(0); // x odom
+      odom_old(1) = odom_cur(1); // y odom
+      odom_old(2) = odom_cur(2); // angle odom
+
+      predict_steps = 0;
+      
     }
+    predict_step_done_ = true;
   }
     
     // ****************************************************************************************************
@@ -546,7 +551,6 @@ void ParticleFilter::Predict(const Eigen::Vector3d &odom_cur) {
     odom_old(0) = odom_cur(0); // x odom
     odom_old(1) = odom_cur(1); // y odom
     odom_old(2) = odom_cur(2); // angle odom
-    odom_initialized_ = true;
     predict_steps++;
   }
 }
@@ -560,6 +564,10 @@ void ParticleFilter::Initialize(const string& map_file,
   map_.Load(map_file);
 
   Particle init;
+
+  std::cout << "Initialize Called" << std::endl;
+  odom_initialized_ = true;
+  predict_steps = 1;
 
   // TODO: set_parameter for Gaussian standard deviation and mean
   for(int i {0}; i < 50; i++){
@@ -576,19 +584,25 @@ void ParticleFilter::GetLocation(Eigen::Vector2f* loc_ptr,
                                  float* angle_ptr) const {
   Vector2f& loc = *loc_ptr;
   float& angle = *angle_ptr;
+
   // Compute the best estimate of the robot's location based on the current set
   // of particles. The computed values must be set to the `loc` and `angle`
   // variables to return them. Modify the following assignments:
   //loc = Vector2f(0, 0);
   //angle = 0;
 
-  // Get Total Length of Input Vector
+  if (predict_step_done_ == false and odom_initialized_== true)
+  {
+    loc.x() = particles_[0].loc.x();
+    loc.y() = particles_[0].loc.y();
+    angle = particles_[0].angle;
+  }
+  else if (predict_step_done_ == true and odom_initialized_ == true)
+  {
+    // Get Total Length of Input Vector
     int vector_length = particles_.size();
-    
-    //if (vector_length == 0)
-    //  vector_length =1;
 
-    //std::cout << "Get Location Called" << std::endl;
+    std::cout << "Get Location Called" << std::endl;
 
     // Initializations
     double sum_x {0};
@@ -599,16 +613,17 @@ void ParticleFilter::GetLocation(Eigen::Vector2f* loc_ptr,
     // Summations for all variables
     for (auto vec:particles_)
     {
-        sum_x += vec.loc.x();
-        sum_y += vec.loc.y();
-        sum_cos_theta += cos(vec.angle);
-        sum_sin_theta += sin(vec.angle);
+      sum_x += vec.loc.x();
+      sum_y += vec.loc.y();
+      sum_cos_theta += cos(vec.angle);
+      sum_sin_theta += sin(vec.angle);
     }
 
     // Averages for x, y, and theta;
     loc.x() = sum_x/vector_length;
     loc.y() = sum_y/vector_length;
     angle = atan2(sum_sin_theta/vector_length,sum_cos_theta/vector_length);
+  }
 }
 
 
