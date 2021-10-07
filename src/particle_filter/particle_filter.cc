@@ -300,7 +300,7 @@ void ParticleFilter::Resample() {
   // particles_ = new_particles;
 
   // Predefine the Number of Resamples; set_parameter
-  int num_of_resamples {30};
+  int num_of_resamples {1};
 
   // Initializations
   std::vector <Particle> reduced_particle_vec; // return vector (vector of the kept particles)
@@ -411,37 +411,28 @@ void ParticleFilter::ObserveLaser(const vector<float>& ranges,
   // A new laser scan observation is available (in the laser frame)
   // Call the Update and Resample steps as necessary.
 
+  // Call Update Every fifth Predict
   if (predict_steps == 0)
   {
     std::cout << "Called Update" << std::endl;
     std::cout << "updates_done: " << updates_done << std::endl;
+
     for(auto &particle : particles_)
     {
       Update(ranges, range_min, range_max, angle_min, angle_max, &particle);
-      // std::cout << "\n\n[PARTICLE VALUES ]"  //debug
-      //             << "\n x: " << particle.loc.x()
-      //             << "\n y: " << particle.loc.y()
-      //             << "\n angle: " << particle.angle
-      //             << "\n weight: " << particle.weight
-      //             << std::endl;
     }
     predict_steps = 1;
     updates_done++;
   }
-  //TODO: set_parameter for number of updates done between each resampling
-  if(updates_done == 3)
-  {
-    std::cout << "***called resample" << std::endl;
-    Resample();
-    updates_done = 0;
-    predict_steps = 1;
-    // std::cout << "\n\n[PARTICLE VALUES ]"  //debug
-    //           << "\n x: " << particle.loc.x()
-    //           << "\n y: " << particle.loc.y()
-    //           << "\n angle: " << particle.angle
-    //           << "\n weight: " << particle.weight
-    //           << std::endl;
-  }
+
+  // // Call Resample Every Third Update
+  // if(updates_done == 3)
+  // {
+  //   std::cout << "***called resample" << std::endl;
+  //   Resample();
+  //   updates_done = 0;
+  //   predict_steps = 1;
+  // }
 }
 
 void ParticleFilter::Predict(const Eigen::Vector3d &odom_cur) {
@@ -453,14 +444,15 @@ void ParticleFilter::Predict(const Eigen::Vector3d &odom_cur) {
   // Reference: Table 5.6 in Sebastian Thrun, Wolfram Bugard & Dieter Fox
   // Calculate Difference Between New and Old Odom Readings
 
-  // std::cout << "ODOM READINGS"
-  //           << "\n cur x: " << odom_cur(0)
-  //           << "\n cur y: " << odom_cur(1)
-  //           << "\n cur t: " << odom_cur(2)
-  //           << "\n old x: " << odom_old(0)
-  //           << "\n old y: " << odom_old(1)
-  //           << "\n old t: " << odom_old(2) << std::endl;
+  std::cout << "ODOM READINGS"
+            << "\n cur x: " << odom_cur(0)
+            << "\n cur y: " << odom_cur(1)
+            << "\n cur t: " << odom_cur(2)
+            << "\n old x: " << odom_old(0)
+            << "\n old y: " << odom_old(1)
+            << "\n old t: " << odom_old(2) << std::endl;
 
+    // Variance Parameters, set_parameter
     double a1 = 0.08;
     double a2 = 0.01;
     double a3 = 0.1;
@@ -470,11 +462,24 @@ void ParticleFilter::Predict(const Eigen::Vector3d &odom_cur) {
     double del_y = odom_cur(1)-odom_old(1);
     double del_rot = odom_cur(2)-odom_old(2);
 
-    // pow pow
-    double del_rot_1 = get_angle_diff(atan2((odom_cur(1)-odom_old(1)),(odom_cur(0)-odom_old(0))),odom_old(2));
+    // Calculating Realative Motion Reference Table 5.6 in Book 
+    std::cout << "\n\ndel_rot_1 Inputs: "
+              << "del_x: " << del_x
+              << "del_y: " << del_y 
+              << "atan2(): " << atan2(del_y,del_x)
+              << std::endl;
+    double del_rot_1 = get_angle_diff(atan2(del_y,del_x),odom_old(2));
     double del_trans = sqrt(pow(del_y,2) + pow(del_x,2));
     double del_rot_2 = get_angle_diff(odom_cur(2),odom_old(2)) - del_rot_1;
+    std::cout << "Outputs "
+              << "del_rot_1: " << del_rot_1
+              << "del_trans: " << del_trans
+              << "del_rot_2: " << del_rot_2
+              << std::endl;
+
+    // Capture Length of Particle Vector
     int particle_vector_length = particles_.size();
+    std::cout << "part_vec_length" << particle_vector_length << std::endl; 
 
   if (odom_initialized_ == true and del_trans != 0 and del_trans < 1 and del_rot < M_PI/2 and del_rot > -M_PI/2 and predict_steps >= 5)
   {
@@ -496,16 +501,25 @@ void ParticleFilter::Predict(const Eigen::Vector3d &odom_cur) {
       particles_[i].loc.y() = particles_[i].loc.y() + del_trans_hat*sin(particles_[i].angle + del_rot_1_hat);
       particles_[i].angle = particles_[i].angle + del_rot_1_hat + del_rot_2_hat;
 
+      // Set Current Odom to the Old Odom
       odom_old(0) = odom_cur(0); // x odom
       odom_old(1) = odom_cur(1); // y odom
       odom_old(2) = odom_cur(2); // angle odom
-
-      predict_steps = 0;
-      
     }
+    // Reset variable used to 
+    predict_steps = 0;
     predict_step_done_ = true;
   }
-    
+  else
+  {
+    // Set current odom values to previous values for next call to predict
+    odom_old(0) = odom_cur(0); // x odom
+    odom_old(1) = odom_cur(1); // y odom
+    odom_old(2) = odom_cur(2); // angle odom
+    predict_steps++;
+  }
+
+      
     // ****************************************************************************************************
     /*
     //std::cout << "odom initialized" << std::endl;
@@ -545,14 +559,6 @@ void ParticleFilter::Predict(const Eigen::Vector3d &odom_cur) {
     }
     */
     // *********************************************************************************************
-  else
-  {
-    // Set current odom values to previous values for next call to predict
-    odom_old(0) = odom_cur(0); // x odom
-    odom_old(1) = odom_cur(1); // y odom
-    odom_old(2) = odom_cur(2); // angle odom
-    predict_steps++;
-  }
 }
 
 void ParticleFilter::Initialize(const string& map_file,
@@ -570,7 +576,7 @@ void ParticleFilter::Initialize(const string& map_file,
   predict_steps = 1;
 
   // TODO: set_parameter for Gaussian standard deviation and mean
-  for(int i {0}; i < 50; i++){
+  for(int i {0}; i < 1; i++){
     init.loc.x() = loc.x() + rng_.Gaussian(0.0, 0.1);
     init.loc.y() = loc.y() + rng_.Gaussian(0.0, 0.1);
     init.angle = angle + rng_.Gaussian(0.0, 0.1);
