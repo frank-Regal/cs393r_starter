@@ -142,5 +142,47 @@ int main (void)
     predicted_point << sample_motion_model_odometry(old_odom, new_odom, pose_last);
     std::cout << predicted_point << std::endl;
 
+    
+      
+    // ****************************************************************************************************
+    /*
+    //std::cout << "odom initialized" << std::endl;
+    // Loop through current list of particles and update the particle location vector based on odom readings
+    for (int i {0}; i < length_of_particles_vec; i++)
+    {
+      // Convert to Map Coordinates
+      double rotation_angle = get_angle_diff(particles_[i].angle, odom_old(2));
+
+      // Rotate Previous Odom about Last Known Particle Location
+      double map_frame_del_x = del_x*cos(rotation_angle) - del_y*sin(rotation_angle);
+      double map_frame_del_y = del_x*cos(rotation_angle) + del_y*sin(rotation_angle);
+      double map_frame_del_trans = sqrt(pow(map_frame_del_x,2) + pow(map_frame_del_y,2));
+
+      // Add Variance to deltas
+      double del_x_hat = map_frame_del_x + rng_.Gaussian(0, ( a1*map_frame_del_trans + a2*abs(del_theta) )); 
+      double del_y_hat = map_frame_del_y + rng_.Gaussian(0, ( a1*map_frame_del_trans + a2*abs(del_theta) )); 
+      double del_theta_hat = del_theta + rng_.Gaussian(0, ( a3*map_frame_del_trans + a4*abs(del_theta) )); 
+
+      //std::cout << "PARTICLE VALUES (0) = "   // debug
+      //          << "x0: " << particles_[i].loc.x()
+      //          << " y0: " << particles_[i].loc.y()
+      //          << " angle0: " << particles_[i].angle
+      //          << std::endl;
+      
+      // Update Particle Location
+      particles_[i].loc.x() += del_x_hat;
+      particles_[i].loc.y() += del_y_hat;
+      particles_[i].angle += del_theta_hat;
+
+      //std::cout << "PARTICLE VALUES (1) = "  //debug
+      //          << "x1: " << particles_[i].loc.x()
+      //          << " y1: " << particles_[i].loc.y()
+      //          << " angle1: " << particles_[i].angle
+      //          << std::endl;
+
+    }
+    */
+    // *********************************************************************************************
+
     return 0;
 }

@@ -51,12 +51,11 @@ using vector_map::VectorMap;
 
 DEFINE_double(num_particles, 50, "Number of particles");
 
-namespace {
-  int updates_done {0};
-}
 
 namespace {
   int predict_steps {0};
+  double max_particle_weight {0};
+  int updates_done {0};
 }
 
 namespace particle_filter {
@@ -116,7 +115,7 @@ void ParticleFilter::GetPredictedPointCloud(const Vector2f& loc,
   Eigen::Vector2f endpoint_of_max_distance_ray;
 
   // Step Size of Scan; set_parameter
-  int step_size_of_scan {30};
+  int step_size_of_scan {40};
 
   // Reduce the input vectors size to account for every 10th laser scan ray
   int length_of_scan_vec = num_ranges/step_size_of_scan;
@@ -239,7 +238,6 @@ void ParticleFilter::Update(const vector<float>& ranges,
 
   // Reset variables between each point cloud
   float weight {0};
-  float max_weight {0};
   float total_weight {0};
 
   // Calculate Weight for Particle
@@ -264,7 +262,7 @@ void ParticleFilter::Update(const vector<float>& ranges,
 
     // Function for weighting the probability of particle being in the location found
     if(particle_actual_distance < range_min or particle_actual_distance > range_max)
-      weight = 0;
+      continue;
     else if (particle_actual_distance < (particle_theoretical_distance - dshort))
       weight = exp(-(pow(dshort,2) / pow(ray_std_dev,2)));
     else if (particle_actual_distance > (particle_theoretical_distance + dlong))
@@ -277,74 +275,47 @@ void ParticleFilter::Update(const vector<float>& ranges,
     // Update Total Probability for this particle
     //std::cout << "weight: " << weight << std::endl; //debug
     total_weight += weight;
-
-    // Calculate Max Weight for log calculation
-    if(weight > max_weight)
-      max_weight = weight;
   }
   particle.weight = total_weight;
-  //std::cout << "Particle Weight Max: " << max_weight << std::endl; // debug
-  //std::cout << "Particle Weight Total: " << particle.weight << std::endl; //debug
-  //particle.weight = particle.weight/max_weight;
-  //std::cout << "Normalized Particle Weights: " << particle.weight << std::endl; // debug
 }
 
 void ParticleFilter::Resample() {
   // Resample the particles, proportional to their weights.
   // The current particles are in the `particles_` variable. 
-  // Create a variable to store the new particles, and when done, replace the
-  // old set of particles:
-  // vector<Particle> new_particles';
-  // During resampling: 
-  //    new_particles.push_back(...)
-  // After resampling:
-  // particles_ = new_particles;
 
   // Predefine the Number of Resamples; set_parameter
-  int num_of_resamples {10};
+  int num_of_resamples {50};
 
   // Initializations
   std::vector <Particle> reduced_particle_vec; // return vector (vector of the kept particles)
+  std::vector <Particle> norm_particle_vec;    // new norm particle vec
   double weight_sum {0};                       // comparison variable 
   double total_weight {0};                     // total weight of all particles
-  double max_weight {0};
   int k {0};                                   // edge case variable
-
-  
-  // Get Length of Input Vector for Looping
-  int input_vec_length = particles_.size();
+  int input_vec_length = particles_.size();    // Get Length of Input Vector for Looping
+  std::vector <double> norm_particle_weight;
 
   // Step 1: Normalize Weights
-  //  a. Compute Sum of All Weights
-  for (auto get_particle: particles_)
-  {
-      if (get_particle.weight > max_weight)
-        max_weight = get_particle.weight;
-      
-  }
-  //std::cout << "max_weight: " << max_weight << std::endl;
-
-  //  b. Repopulate the weights with normalized weights (reference 51:00 Min in Lecture 2021.09.22)
+  // Repopulate the weights with normalized weights (reference 51:00 Min in Lecture 2021.09.22)
   for (int k {0}; k < input_vec_length; k++)
   {
-    //std::cout << "Unormalized Particles: " << particles_[k].weight << std::endl;
-    particles_[k].weight = abs(particles_[k].weight - max_weight);
-    //std::cout << "Normalized Particles: " << particles_[k].weight << std::endl;
+    // particles_[k].weight = abs(exp(particles_[k].weight - max_particle_weight));
+    norm_particle_weight.push_back(abs(exp(particles_[k].weight - max_particle_weight)));
+    total_weight += norm_particle_weight[k];
   }
 
   // Step 2: Compute Sum of Normalized Weights
   // Compute Sum of Particle Weights to Get Upper Container Bound
-  for (auto get_particle: particles_)
-  {
-      total_weight += get_particle.weight;
-      //std::cout << "total_weight: " << total_weight << std::endl;
-  }
+  // for (auto get_particle: particles_)
+  // {
+  //     total_weight += get_particle.weight;
+  // }
 
   // Step 3: Loop through each weight and resample
   // Main Loop; RESAMPLE
   for (int i {0}; i < num_of_resamples; i++)
   {   
-      // reset comparison variable
+      // reset comparison variable for bin navigation
       weight_sum = 0;
 
       // get a random number
@@ -372,12 +343,12 @@ void ParticleFilter::Resample() {
           else if (random_num > weight_sum)
           {
               // Add a weight
-              weight_sum += particles_[j].weight;
+              weight_sum += norm_particle_weight[j];
 
               // Check if random number is on the edge of two buckets
               if (random_num == weight_sum)
               {
-                  k = (particles_[j].weight <= particles_[j+1].weight) ? j+1 : j; 
+                  k = (norm_particle_weight[j] <= norm_particle_weight[j+1]) ? j+1 : j; 
                   reduced_particle_vec.push_back(particles_[k]);
                   //std::cout << " Particle (" << iter << ") on edge; added to output vec" << std::endl; // debug
               }
@@ -389,19 +360,11 @@ void ParticleFilter::Resample() {
               }
           }
       }
-
-      // Erase existing particles_ vector and fill with resampled particle vector (reduced_particle_vec)
-      // CHECK 
-      //particles_.erase(particles_.begin(), particles_.end());
-      //particles_ = reduced_particle_vec;
   }
+  // Erase existing particles_ vector and fill with resampled particle vector (reduced_particle_vec)
   particles_.erase(particles_.begin(), particles_.end());
   particles_ = reduced_particle_vec;
-  // You will need to use the uniform random number generator provided. For
-  // example, to generate a random number between 0 and 1:
-  // float x = rng_.UniformRandom(0, 1);
-  // printf("Random number drawn from uniform distribution between 0 and 1: %f\n",
-  //        x);
+
 }
 
 void ParticleFilter::ObserveLaser(const vector<float>& ranges,
@@ -409,35 +372,48 @@ void ParticleFilter::ObserveLaser(const vector<float>& ranges,
                                   float range_max,
                                   float angle_min,
                                   float angle_max) {
+  
   // A new laser scan observation is available (in the laser frame)
   // Call the Update and Resample steps as necessary.
 
-  // Call Update Every fifth Predict
-  // if (predict_steps == 5)
-  // {
-    //std::cout << "Called Update" << std::endl;
-    //std::cout << "updates_done: " << updates_done << std::endl;
-
+  // Check to make sure particles are populated, if not do nothing
+  if (particles_.empty() || odom_initialized_ == false)
+  { 
+    return;
+  }
+  
+  
+  // Call Update Every n'th Predict
+  if (predict_steps == 5)
+  {
     for(auto &particle : particles_)
     {
+      // Call to Update
       Update(ranges, range_min, range_max, angle_min, angle_max, &particle);
-    }
-    predict_steps = 0;
-    updates_done++;
-  // }
 
-  // Call Resample Every Third Update
+      // Update Max Log Particle Weight Based On Return from Update
+      if (particle.weight > max_particle_weight)
+        max_particle_weight = particle.weight;
+    }
+    predict_steps = 0;  // Reset Number of Predicted Steps DOne
+    updates_done++;     // Increment how many times Update has been called to determine when to call Resample
+  }
+
+  // Call Resample Every n'th Update
   if(updates_done == 10)
   {
-    // std::cout << "***called resample" << std::endl;
+    // Call to Resample
     Resample();
+
+    // Reset Number of Updates Done
     updates_done = 0;
-    predict_steps = 1;
   }
+  
 }
 
 
 void ParticleFilter::Predict(const Eigen::Vector3d &odom_cur) {
+  
   // Implement the predict step of the particle filter here.
   // A new odometry value is available (in the odom frame)
   // Implement the motion model predict step here, to propagate the particles
@@ -446,44 +422,26 @@ void ParticleFilter::Predict(const Eigen::Vector3d &odom_cur) {
   // Reference: Table 5.6 in Sebastian Thrun, Wolfram Bugard & Dieter Fox
   // Calculate Difference Between New and Old Odom Readings
 
-  //std::cout << "ODOM READINGS"
-  //          << "\n cur x: " << odom_cur(0)
-  //          << "\n cur y: " << odom_cur(1)
-  //          << "\n cur t: " << odom_cur(2)
-  //          << "\n old x: " << odom_old(0)
-  //          << "\n old y: " << odom_old(1)
-  //          << "\n old t: " << odom_old(2) << std::endl;
+  // Variance Parameters, set_parameter
+  double a1 = 8;  // 0.08 // angle 
+  double a2 = 8;  //0.01; // angle 
+  double a3 = 20;  //0.1; // trans
+  double a4 = 12;  //0.1; // trans
 
-    // Variance Parameters, set_parameter
-    double a1 = 0.09; // 0.08
-    double a2 = 0.01;
-    double a3 = 0.1;
-    double a4 = 0.1;
+  // Calculate Relative Odometry
+  double del_x = odom_cur(0)-odom_old(0);
+  double del_y = odom_cur(1)-odom_old(1);
+  double del_rot = odom_cur(2)-odom_old(2);
 
-    double del_x = odom_cur(0)-odom_old(0);
-    double del_y = odom_cur(1)-odom_old(1);
-    double del_rot = odom_cur(2)-odom_old(2);
+  // Calculate Deltas based on Odom Data
+  double del_rot_1 = atan2(del_y,del_x) - odom_old(2);
+  double del_trans = sqrt(pow(del_y,2) + pow(del_x,2));
+  double del_rot_2 = odom_cur(2) - odom_old(2) - del_rot_1;
 
-    // Calculating Realative Motion Reference Table 5.6 in Book 
-    // std::cout << "\n\ndel_rot_1 Inputs: "
-    //           << "del_x: " << del_x
-    //           << "del_y: " << del_y 
-    //           << "atan2(): " << atan2(del_y,del_x)
-    //           << std::endl;
-    double del_rot_1 = get_angle_diff(atan2(del_y,del_x),odom_old(2));
-    double del_trans = sqrt(pow(del_y,2) + pow(del_x,2));
-    double del_rot_2 = get_angle_diff(odom_cur(2),odom_old(2)) - del_rot_1;
-    // std::cout << "Outputs "
-    //           << "del_rot_1: " << del_rot_1
-    //           << "del_trans: " << del_trans
-    //           << "del_rot_2: " << del_rot_2
-    //           << std::endl;
+  // Capture Length of Particle Vector
+  int particle_vector_length = particles_.size();
 
-    // Capture Length of Particle Vector
-    int particle_vector_length = particles_.size();
-    // std::cout << "part_vec_length" << particle_vector_length << std::endl; 
-
-  if (odom_initialized_ == true and del_trans != 0 and del_trans < 5 and del_rot < M_PI/2 and del_rot > -M_PI/2) //  and predict_steps >= 5
+  if (odom_initialized_ == true and del_trans != 0 and del_trans < 1 and del_rot < M_PI/2 and del_rot > -M_PI/2)
   {
     // std::cout << "\n\nPREDICT CALLED" << std::endl;
     for (int i {0}; i < particle_vector_length; i++) 
@@ -508,82 +466,42 @@ void ParticleFilter::Predict(const Eigen::Vector3d &odom_cur) {
       odom_old(1) = odom_cur(1); // y odom
       odom_old(2) = odom_cur(2); // angle odom
     }
-    // Reset variable used to 
-    predict_steps++;
-    predict_step_done_ = true;
+    predict_steps++;             // keep track of how many predicts we did for call to update
   }
   else
   {
     // Set current odom values to previous values for next call to predict
-    odom_old(0) = odom_cur(0); // x odom
-    odom_old(1) = odom_cur(1); // y odom
-    odom_old(2) = odom_cur(2); // angle odom
-    //predict_steps++;
+    odom_old(0) = odom_cur(0);  // x odom
+    odom_old(1) = odom_cur(1);  // y odom
+    odom_old(2) = odom_cur(2);  // angle odom
   }
-
-      
-    // ****************************************************************************************************
-    /*
-    //std::cout << "odom initialized" << std::endl;
-    // Loop through current list of particles and update the particle location vector based on odom readings
-    for (int i {0}; i < length_of_particles_vec; i++)
-    {
-      // Convert to Map Coordinates
-      double rotation_angle = get_angle_diff(particles_[i].angle, odom_old(2));
-
-      // Rotate Previous Odom about Last Known Particle Location
-      double map_frame_del_x = del_x*cos(rotation_angle) - del_y*sin(rotation_angle);
-      double map_frame_del_y = del_x*cos(rotation_angle) + del_y*sin(rotation_angle);
-      double map_frame_del_trans = sqrt(pow(map_frame_del_x,2) + pow(map_frame_del_y,2));
-
-      // Add Variance to deltas
-      double del_x_hat = map_frame_del_x + rng_.Gaussian(0, ( a1*map_frame_del_trans + a2*abs(del_theta) )); 
-      double del_y_hat = map_frame_del_y + rng_.Gaussian(0, ( a1*map_frame_del_trans + a2*abs(del_theta) )); 
-      double del_theta_hat = del_theta + rng_.Gaussian(0, ( a3*map_frame_del_trans + a4*abs(del_theta) )); 
-
-      //std::cout << "PARTICLE VALUES (0) = "   // debug
-      //          << "x0: " << particles_[i].loc.x()
-      //          << " y0: " << particles_[i].loc.y()
-      //          << " angle0: " << particles_[i].angle
-      //          << std::endl;
-      
-      // Update Particle Location
-      particles_[i].loc.x() += del_x_hat;
-      particles_[i].loc.y() += del_y_hat;
-      particles_[i].angle += del_theta_hat;
-
-      //std::cout << "PARTICLE VALUES (1) = "  //debug
-      //          << "x1: " << particles_[i].loc.x()
-      //          << " y1: " << particles_[i].loc.y()
-      //          << " angle1: " << particles_[i].angle
-      //          << std::endl;
-
-    }
-    */
-    // *********************************************************************************************
 }
 
 void ParticleFilter::Initialize(const string& map_file,
                                 const Vector2f& loc,
                                 const float angle) {
+
   // The "set_pose" button on the GUI was clicked, or an initialization message
   // was received from the log. Initialize the particles accordingly, e.g. with
   // some distribution around the provided location and angle.
-  std::cout << "init" << std::endl;
 
+  // Load Desired Map
   map_.Load(map_file);
 
-  // std::cout << "Initialize Called" << std::endl;
+  // Clear out particle vector to start fresh
+  particles_.clear();
+
+  // Initialize Variables
   Particle init_particle_cloud;
   odom_initialized_ = true;
   predict_steps = 1;
-  int num_of_init_particle_cloud = 50;
+  int num_of_init_particle_cloud = 50;  // set_parameter; number of particles to initialize with
 
   // set_parameter for Gaussian standard deviation and mean
   for(int i {0}; i < num_of_init_particle_cloud; i++){
-    init_particle_cloud.loc.x() = loc.x() + rng_.Gaussian(0.0, 0.1);
-    init_particle_cloud.loc.y() = loc.y() + rng_.Gaussian(0.0, 0.1);
-    init_particle_cloud.angle = angle + rng_.Gaussian(0.0, 0.1);
+    init_particle_cloud.loc.x() = loc.x() + rng_.Gaussian(0.0, 0.75);
+    init_particle_cloud.loc.y() = loc.y() + rng_.Gaussian(0.0, 0.5);
+    init_particle_cloud.angle = angle + rng_.Gaussian(0.0, 0.3);
     init_particle_cloud.weight = 0;
     particles_.push_back(init_particle_cloud);
   }
@@ -598,41 +516,38 @@ void ParticleFilter::GetLocation(Eigen::Vector2f* loc_ptr,
   // Compute the best estimate of the robot's location based on the current set
   // of particles. The computed values must be set to the `loc` and `angle`
   // variables to return them. Modify the following assignments:
-  //loc = Vector2f(0, 0);
-  //angle = 0;
 
-  if (predict_step_done_ == false and odom_initialized_== true)
+
+  if (odom_initialized_ == true)
   {
-    loc.x() = particles_[0].loc.x();
-    loc.y() = particles_[0].loc.y();
-    angle = particles_[0].angle;
-  }
-  else if (predict_step_done_ == true and odom_initialized_ == true)
-  {
-    // Get Total Length of Input Vector
-    int vector_length = particles_.size();
-
-    // std::cout << "Get Location Called" << std::endl;
-
-    // Initializations
+    // Initialize Variables
     double sum_x {0};
     double sum_y {0};
     double sum_cos_theta {0};
     double sum_sin_theta {0};
+    double total_particle_weight {0};
 
     // Summations for all variables
-    for (auto vec:particles_)
+    for (auto particles:particles_)
     {
-      sum_x += vec.loc.x();
-      sum_y += vec.loc.y();
-      sum_cos_theta += cos(vec.angle);
-      sum_sin_theta += sin(vec.angle);
+      // Normalize Particle Weights
+      double particle_norm_weight = abs(exp(particles.weight - max_particle_weight));
+
+      // Add All Normalized Particle Weights
+      total_particle_weight += particle_norm_weight;
+
+      // Calculate Numertors for Output location
+      sum_x += particles.loc.x() * particle_norm_weight;
+      sum_y += particles.loc.y() * particle_norm_weight;
+      sum_cos_theta += cos(particles.angle) * particle_norm_weight;
+      sum_sin_theta += sin(particles.angle) * particle_norm_weight;
+      
     }
 
     // Averages for x, y, and theta;
-    loc.x() = sum_x/vector_length;
-    loc.y() = sum_y/vector_length;
-    angle = atan2(sum_sin_theta/vector_length,sum_cos_theta/vector_length);
+    loc.x() = sum_x/total_particle_weight;
+    loc.y() = sum_y/total_particle_weight;
+    angle = atan2(sum_sin_theta/total_particle_weight,sum_cos_theta/total_particle_weight);
   }
 }
 
