@@ -39,6 +39,7 @@ struct Particle {
   double weight;
 };
 
+
 class ParticleFilter {
  public:
   // Default Constructor.

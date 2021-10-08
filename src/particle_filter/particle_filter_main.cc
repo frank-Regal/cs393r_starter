@@ -108,7 +108,7 @@ void PublishParticles() {
 }
 
 void PublishPredictedScan() {
-  const uint32_t kColor = 0xd67d00;
+  const uint32_t kColor = 0xd600a8;
   Vector2f robot_loc(0, 0);
   float robot_angle(0);
   particle_filter_.GetLocation(&robot_loc, &robot_angle);
@@ -177,7 +177,7 @@ void LaserCallback(const sensor_msgs::LaserScan& msg) {
       msg.range_max,
       msg.angle_min,
       msg.angle_max);
-  //PublishVisualization();
+  PublishVisualization();
 }
 
 void OdometryCallback(const nav_msgs::Odometry& msg) {
@@ -203,16 +203,16 @@ void OdometryCallback(const nav_msgs::Odometry& msg) {
   
   particle_filter_.GetLocation(&robot_loc, &robot_angle);
 
-  std::cout << "robot_loc, x: " << robot_loc.x()
-            << "\nrobot_loc, y: " << robot_loc.y()
-            << "\nrobot_angle: " << robot_angle << std::endl;
+  // std::cout << "\n\nrobot_loc, x: " << robot_loc.x()
+            // << "\nrobot_loc, y: " << robot_loc.y()
+            // << "\nrobot_angle: " << robot_angle << std::endl;
 
   amrl_msgs::Localization2DMsg localization_msg;
   localization_msg.pose.x = robot_loc.x();
   localization_msg.pose.y = robot_loc.y();
   localization_msg.pose.theta = robot_angle;
   localization_publisher_.publish(localization_msg);
-  //PublishVisualization();
+  PublishVisualization();
 }
 
 void InitCallback(const amrl_msgs::Localization2DMsg& msg) {
@@ -265,7 +265,7 @@ int main(int argc, char** argv) {
   ros::NodeHandle n;
   InitializeMsgs();
 
-  std::cout << "main called" << std::endl;
+  std::cout << "Here we go again..." << std::endl;
 
   visualization_publisher_ =
       n.advertise<VisualizationMsg>("visualization", 1);

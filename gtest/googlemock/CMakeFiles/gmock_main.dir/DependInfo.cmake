@@ -19,6 +19,10 @@ set(CMAKE_TARGET_DEFINITIONS_CXX
 # The include file search paths:
 set(CMAKE_CXX_TARGET_INCLUDE_PATH
   "include"
+  "/mnt/c/Users/regal/devel/github_frank_Regal/autonomous_robot/ut_automata/msg_gen/cpp/include"
+  "/mnt/c/Users/regal/devel/github_frank_Regal/autonomous_robot/amrl_msgs/msg_gen/cpp/include"
+  "/mnt/c/Users/regal/devel/github_frank_Regal/autonomous_robot/amrl_msgs/srv_gen/cpp/include"
+  "/opt/ros/melodic/include"
   "/usr/src/googletest/googlemock/include"
   "/usr/src/googletest/googlemock"
   "/usr/src/googletest/googletest/include"

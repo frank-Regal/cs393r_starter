@@ -116,10 +116,11 @@ void ParticleFilter::GetPredictedPointCloud(const Vector2f& loc,
   Eigen::Vector2f endpoint_of_max_distance_ray;
 
   // Step Size of Scan; set_parameter
-  int step_size_of_scan {10};
+  int step_size_of_scan {30};
 
   // Reduce the input vectors size to account for every 10th laser scan ray
   int length_of_scan_vec = num_ranges/step_size_of_scan;
+
   //std::cout << "length_of_scan_vec: " << length_of_scan_vec << std::endl; //debug
   scan.resize(length_of_scan_vec);
 
@@ -300,7 +301,7 @@ void ParticleFilter::Resample() {
   // particles_ = new_particles;
 
   // Predefine the Number of Resamples; set_parameter
-  int num_of_resamples {1};
+  int num_of_resamples {10};
 
   // Initializations
   std::vector <Particle> reduced_particle_vec; // return vector (vector of the kept particles)
@@ -412,28 +413,29 @@ void ParticleFilter::ObserveLaser(const vector<float>& ranges,
   // Call the Update and Resample steps as necessary.
 
   // Call Update Every fifth Predict
-  if (predict_steps == 0)
-  {
-    std::cout << "Called Update" << std::endl;
-    std::cout << "updates_done: " << updates_done << std::endl;
+  // if (predict_steps == 5)
+  // {
+    //std::cout << "Called Update" << std::endl;
+    //std::cout << "updates_done: " << updates_done << std::endl;
 
     for(auto &particle : particles_)
     {
       Update(ranges, range_min, range_max, angle_min, angle_max, &particle);
     }
-    predict_steps = 1;
+    predict_steps = 0;
     updates_done++;
-  }
-
-  // // Call Resample Every Third Update
-  // if(updates_done == 3)
-  // {
-  //   std::cout << "***called resample" << std::endl;
-  //   Resample();
-  //   updates_done = 0;
-  //   predict_steps = 1;
   // }
+
+  // Call Resample Every Third Update
+  if(updates_done == 10)
+  {
+    // std::cout << "***called resample" << std::endl;
+    Resample();
+    updates_done = 0;
+    predict_steps = 1;
+  }
 }
+
 
 void ParticleFilter::Predict(const Eigen::Vector3d &odom_cur) {
   // Implement the predict step of the particle filter here.
@@ -444,16 +446,16 @@ void ParticleFilter::Predict(const Eigen::Vector3d &odom_cur) {
   // Reference: Table 5.6 in Sebastian Thrun, Wolfram Bugard & Dieter Fox
   // Calculate Difference Between New and Old Odom Readings
 
-  std::cout << "ODOM READINGS"
-            << "\n cur x: " << odom_cur(0)
-            << "\n cur y: " << odom_cur(1)
-            << "\n cur t: " << odom_cur(2)
-            << "\n old x: " << odom_old(0)
-            << "\n old y: " << odom_old(1)
-            << "\n old t: " << odom_old(2) << std::endl;
+  //std::cout << "ODOM READINGS"
+  //          << "\n cur x: " << odom_cur(0)
+  //          << "\n cur y: " << odom_cur(1)
+  //          << "\n cur t: " << odom_cur(2)
+  //          << "\n old x: " << odom_old(0)
+  //          << "\n old y: " << odom_old(1)
+  //          << "\n old t: " << odom_old(2) << std::endl;
 
     // Variance Parameters, set_parameter
-    double a1 = 0.08;
+    double a1 = 0.09; // 0.08
     double a2 = 0.01;
     double a3 = 0.1;
     double a4 = 0.1;
@@ -463,27 +465,27 @@ void ParticleFilter::Predict(const Eigen::Vector3d &odom_cur) {
     double del_rot = odom_cur(2)-odom_old(2);
 
     // Calculating Realative Motion Reference Table 5.6 in Book 
-    std::cout << "\n\ndel_rot_1 Inputs: "
-              << "del_x: " << del_x
-              << "del_y: " << del_y 
-              << "atan2(): " << atan2(del_y,del_x)
-              << std::endl;
+    // std::cout << "\n\ndel_rot_1 Inputs: "
+    //           << "del_x: " << del_x
+    //           << "del_y: " << del_y 
+    //           << "atan2(): " << atan2(del_y,del_x)
+    //           << std::endl;
     double del_rot_1 = get_angle_diff(atan2(del_y,del_x),odom_old(2));
     double del_trans = sqrt(pow(del_y,2) + pow(del_x,2));
     double del_rot_2 = get_angle_diff(odom_cur(2),odom_old(2)) - del_rot_1;
-    std::cout << "Outputs "
-              << "del_rot_1: " << del_rot_1
-              << "del_trans: " << del_trans
-              << "del_rot_2: " << del_rot_2
-              << std::endl;
+    // std::cout << "Outputs "
+    //           << "del_rot_1: " << del_rot_1
+    //           << "del_trans: " << del_trans
+    //           << "del_rot_2: " << del_rot_2
+    //           << std::endl;
 
     // Capture Length of Particle Vector
     int particle_vector_length = particles_.size();
-    std::cout << "part_vec_length" << particle_vector_length << std::endl; 
+    // std::cout << "part_vec_length" << particle_vector_length << std::endl; 
 
-  if (odom_initialized_ == true and del_trans != 0 and del_trans < 1 and del_rot < M_PI/2 and del_rot > -M_PI/2 and predict_steps >= 5)
+  if (odom_initialized_ == true and del_trans != 0 and del_trans < 5 and del_rot < M_PI/2 and del_rot > -M_PI/2) //  and predict_steps >= 5
   {
-    std::cout << "\n\nPREDICT CALLED" << std::endl;
+    // std::cout << "\n\nPREDICT CALLED" << std::endl;
     for (int i {0}; i < particle_vector_length; i++) 
     {   
       // Calculate Variance
@@ -507,7 +509,7 @@ void ParticleFilter::Predict(const Eigen::Vector3d &odom_cur) {
       odom_old(2) = odom_cur(2); // angle odom
     }
     // Reset variable used to 
-    predict_steps = 0;
+    predict_steps++;
     predict_step_done_ = true;
   }
   else
@@ -516,7 +518,7 @@ void ParticleFilter::Predict(const Eigen::Vector3d &odom_cur) {
     odom_old(0) = odom_cur(0); // x odom
     odom_old(1) = odom_cur(1); // y odom
     odom_old(2) = odom_cur(2); // angle odom
-    predict_steps++;
+    //predict_steps++;
   }
 
       
@@ -567,21 +569,23 @@ void ParticleFilter::Initialize(const string& map_file,
   // The "set_pose" button on the GUI was clicked, or an initialization message
   // was received from the log. Initialize the particles accordingly, e.g. with
   // some distribution around the provided location and angle.
+  std::cout << "init" << std::endl;
+
   map_.Load(map_file);
 
-  Particle init;
-
-  std::cout << "Initialize Called" << std::endl;
+  // std::cout << "Initialize Called" << std::endl;
+  Particle init_particle_cloud;
   odom_initialized_ = true;
   predict_steps = 1;
+  int num_of_init_particle_cloud = 50;
 
-  // TODO: set_parameter for Gaussian standard deviation and mean
-  for(int i {0}; i < 1; i++){
-    init.loc.x() = loc.x() + rng_.Gaussian(0.0, 0.1);
-    init.loc.y() = loc.y() + rng_.Gaussian(0.0, 0.1);
-    init.angle = angle + rng_.Gaussian(0.0, 0.1);
-    init.weight = 0;
-    particles_.push_back(init);
+  // set_parameter for Gaussian standard deviation and mean
+  for(int i {0}; i < num_of_init_particle_cloud; i++){
+    init_particle_cloud.loc.x() = loc.x() + rng_.Gaussian(0.0, 0.1);
+    init_particle_cloud.loc.y() = loc.y() + rng_.Gaussian(0.0, 0.1);
+    init_particle_cloud.angle = angle + rng_.Gaussian(0.0, 0.1);
+    init_particle_cloud.weight = 0;
+    particles_.push_back(init_particle_cloud);
   }
 
 }
@@ -608,7 +612,7 @@ void ParticleFilter::GetLocation(Eigen::Vector2f* loc_ptr,
     // Get Total Length of Input Vector
     int vector_length = particles_.size();
 
-    std::cout << "Get Location Called" << std::endl;
+    // std::cout << "Get Location Called" << std::endl;
 
     // Initializations
     double sum_x {0};
