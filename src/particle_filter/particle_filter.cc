@@ -228,6 +228,7 @@ void ParticleFilter::Update(const vector<float>& ranges,
   // Tuning parameters for the minimum and maximum distances of the laser scanner; set_parameter
   double dshort = 0.5;
   double dlong = 0.5;
+  double gamma = 0.8;
 
   // // Adding tuning params for Min and Max Ranges of Physical Laser Scanner
   // float min_range_with_tuning = range_min + range_min * min_dist_tuning;
@@ -276,7 +277,7 @@ void ParticleFilter::Update(const vector<float>& ranges,
     //std::cout << "weight: " << weight << std::endl; //debug
     total_weight += weight;
   }
-  particle.weight = total_weight;
+  particle.weight = gamma * total_weight;
 }
 
 void ParticleFilter::Resample() {
@@ -288,12 +289,11 @@ void ParticleFilter::Resample() {
 
   // Initializations
   std::vector <Particle> reduced_particle_vec; // return vector (vector of the kept particles)
-  std::vector <Particle> norm_particle_vec;    // new norm particle vec
   double weight_sum {0};                       // comparison variable 
   double total_weight {0};                     // total weight of all particles
   int k {0};                                   // edge case variable
   int input_vec_length = particles_.size();    // Get Length of Input Vector for Looping
-  std::vector <double> norm_particle_weight;
+  std::vector <double> norm_particle_weight;   // norm particle vec
 
   // Step 1: Normalize Weights
   // Repopulate the weights with normalized weights (reference 51:00 Min in Lecture 2021.09.22)
@@ -304,14 +304,7 @@ void ParticleFilter::Resample() {
     total_weight += norm_particle_weight[k];
   }
 
-  // Step 2: Compute Sum of Normalized Weights
-  // Compute Sum of Particle Weights to Get Upper Container Bound
-  // for (auto get_particle: particles_)
-  // {
-  //     total_weight += get_particle.weight;
-  // }
-
-  // Step 3: Loop through each weight and resample
+  // Step 2: Loop through each weight and resample
   // Main Loop; RESAMPLE
   for (int i {0}; i < num_of_resamples; i++)
   {   
