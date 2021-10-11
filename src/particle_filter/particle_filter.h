@@ -39,6 +39,7 @@ struct Particle {
   double weight;
 };
 
+
 class ParticleFilter {
  public:
   // Default Constructor.
@@ -52,8 +53,7 @@ class ParticleFilter {
                     float angle_max);
 
   // Predict particle motion based on odometry.
-  void Predict(const Eigen::Vector2f& odom_loc,
-                       const float odom_angle);
+  void Predict(const Eigen::Vector3d &odom_cur);
 
   // Initialize the robot location.
   void Initialize(const std::string& map_file,
@@ -87,6 +87,8 @@ class ParticleFilter {
                               float angle_max,
                               std::vector<Eigen::Vector2f>* scan);
 
+ double get_angle_diff(double a, double b);
+  
  private:
 
   // List of particles being tracked.
@@ -99,9 +101,11 @@ class ParticleFilter {
   util_random::Random rng_;
 
   // Previous odometry-reported locations.
+  Eigen::Vector3d odom_old;
   Eigen::Vector2f prev_odom_loc_;
   float prev_odom_angle_;
   bool odom_initialized_;
+  bool predict_step_done_;
 };
 }  // namespace slam
 
