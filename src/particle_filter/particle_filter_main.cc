@@ -103,7 +103,8 @@ void PublishParticles() {
   vector<particle_filter::Particle> particles;
   particle_filter_.GetParticles(&particles);
   for (const particle_filter::Particle& p : particles) {
-    DrawParticle(p.loc, p.angle, vis_msg_);
+    //DrawParticle(p.loc, p.angle, vis_msg_);
+    DrawPoint(p.loc,0xeb3434,vis_msg_);
   }
 }
 
@@ -124,6 +125,7 @@ void PublishPredictedScan() {
       &predicted_scan);
   for (const Vector2f& p : predicted_scan) {
     DrawPoint(p, kColor, vis_msg_);
+    DrawLine(robot_loc, p,kColor,vis_msg_);
   }
 }
 
