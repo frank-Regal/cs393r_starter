@@ -115,7 +115,7 @@ void ParticleFilter::GetPredictedPointCloud(const Vector2f& loc,
   Eigen::Vector2f endpoint_of_max_distance_ray;
 
   // Step Size of Scan; set_parameter
-  int step_size_of_scan {40};
+  int step_size_of_scan {20};
 
   // Reduce the input vectors size to account for every 10th laser scan ray
   int length_of_scan_vec = num_ranges/step_size_of_scan;
@@ -488,13 +488,25 @@ void ParticleFilter::Initialize(const string& map_file,
   Particle init_particle_cloud;
   odom_initialized_ = true;
   predict_steps = 1;
-  int num_of_init_particle_cloud = 50;  // set_parameter; number of particles to initialize with
+  //int num_of_init_particle_cloud = 50;  // set_parameter; number of particles to initialize with
+
+  // Debug Matrix
+  std::vector <Eigen::Vector2f> particle_matrix;
+  for (float t {0}; t < 0.8; )
+  {
+    for (float s {0}; s < 0.8; )
+    {
+      particle_matrix.push_back(Eigen::Vector2f (s, t));
+      s += 0.1;
+    }
+    t += 0.1;
+  }
 
   // set_parameter for Gaussian standard deviation and mean
-  for(int i {0}; i < num_of_init_particle_cloud; i++){
-    init_particle_cloud.loc.x() = loc.x() + rng_.Gaussian(0.0, 0.75);
-    init_particle_cloud.loc.y() = loc.y() + rng_.Gaussian(0.0, 0.5);
-    init_particle_cloud.angle = angle + rng_.Gaussian(0.0, 0.3);
+  for(auto particle: particle_matrix){
+    init_particle_cloud.loc.x() = loc.x() + particle.x();
+    init_particle_cloud.loc.y() = loc.y() + particle.y();
+    init_particle_cloud.angle = angle;
     init_particle_cloud.weight = 0;
     particles_.push_back(init_particle_cloud);
   }
@@ -524,7 +536,8 @@ void ParticleFilter::GetLocation(Eigen::Vector2f* loc_ptr,
     for (auto particles:particles_)
     {
       // Normalize Particle Weights
-      double particle_norm_weight = abs(exp(particles.weight - max_particle_weight));
+      double particle_norm_weight = exp(particles.weight - max_particle_weight);
+      std::cout << "Particle_norm_weight: " << particle_norm_weight << std::endl;
 
       // Add All Normalized Particle Weights
       total_particle_weight += particle_norm_weight;
