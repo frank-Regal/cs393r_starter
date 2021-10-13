@@ -283,79 +283,46 @@ void ParticleFilter::Update(const vector<float>& ranges,
 void ParticleFilter::Resample() {
   // Resample the particles, proportional to their weights.
   // The current particles are in the `particles_` variable. 
-
-  // Predefine the Number of Resamples; set_parameter
-  int num_of_resamples {50};
+  
+  // Predefine the Number of Resamples based on number of particles; set_parameter
+  int num_of_resamples {0};
+  num_of_resamples = particles_.size();
 
   // Initializations
-  std::vector <Particle> reduced_particle_vec; // return vector (vector of the kept particles)
-  double weight_sum {0};                       // comparison variable 
-  double total_weight {0};                     // total weight of all particles
-  int k {0};                                   // edge case variable
-  int input_vec_length = particles_.size();    // Get Length of Input Vector for Looping
-  std::vector <double> norm_particle_weight;   // norm particle vec
+  std::vector <Particle> reduced_particle_vec;      // return vector (vector of the kept particles)
+  std::vector <double> norm_particle_weight;        // norm particle vec
+  std::vector <double> bin_edges(num_of_resamples); // vector for low variance resample bins   
+  double total_weight {0};                          // total weight of all particles
+  int input_vec_length = particles_.size();         // Get Length of Input Vector for Looping
 
-  // Step 1: Normalize Weights
+  // Step 1: Normalize Particle Weights
   // Repopulate the weights with normalized weights (reference 51:00 Min in Lecture 2021.09.22)
   for (int k {0}; k < input_vec_length; k++)
   {
-    // particles_[k].weight = abs(exp(particles_[k].weight - max_particle_weight));
     norm_particle_weight.push_back(abs(exp(particles_[k].weight - max_particle_weight)));
     total_weight += norm_particle_weight[k];
+    bin_edges[k] = total_weight;
   }
 
-  // Step 2: Loop through each weight and resample
-  // Main Loop; RESAMPLE
-  for (int i {0}; i < num_of_resamples; i++)
-  {   
-      // reset comparison variable for bin navigation
-      weight_sum = 0;
+  // Step 2: Draw A Random Number
+  // get equidistant location for low variance resample
+  float equidistant_loc = total_weight/num_of_resamples;
+  // get a random number
+  float random_num = rng_.UniformRandom(0, equidistant_loc);
 
-      // get a random number
-      float random_num = rng_.UniformRandom(0, total_weight);
-      //std::cout << "\n[Iter: " << i << "]\n Random Number: " << random_num << std::endl; // _____________ debug
-
-      // loop through each particle weight/bucket
-      for (int j {0}; j < input_vec_length; j++)
-      {
-          // zero case
-          if (random_num == 0.00) 
-          {
-              reduced_particle_vec.push_back(particles_[0]);
-              //std::cout << " Particle (" << iter << ") equaled min; added to output vec" << std::endl; // debug
-              break;
-          }
-          // max case
-          else if (random_num == total_weight)
-          {
-              reduced_particle_vec.push_back(particles_[input_vec_length-1]);
-              //std::cout << " Particle (" << iter << ") equaled max; added to output vec" << std::endl; // debug
-              break;
-          }
-          // middle bucket cases; keep adding buckets if the random number is not equal
-          else if (random_num > weight_sum)
-          {
-              // Add a weight
-              weight_sum += norm_particle_weight[j];
-
-              // Check if random number is on the edge of two buckets
-              if (random_num == weight_sum)
-              {
-                  k = (norm_particle_weight[j] <= norm_particle_weight[j+1]) ? j+1 : j; 
-                  reduced_particle_vec.push_back(particles_[k]);
-                  //std::cout << " Particle (" << iter << ") on edge; added to output vec" << std::endl; // debug
-              }
-              // Check if random number is less than the next bucket, and add to output vector
-              else if (random_num < weight_sum)
-              {
-                  reduced_particle_vec.push_back(particles_[j]);
-                  //std::cout << " Particle (" << iter << ") added to output vec" << std::endl; // ________ debug
-              }
-          }
-      }
+  // Step 3: Low Variance Resample
+  for (int m {0}; m < num_of_resamples; m++)
+  {
+    while (bin_edges[m] > random_num)
+    {
+      reduced_particle_vec.push_back(particles_[m]);
+      random_num += equidistant_loc;
+    }
   }
-  // Erase existing particles_ vector and fill with resampled particle vector (reduced_particle_vec)
-  particles_.erase(particles_.begin(), particles_.end());
+
+  // Step 4: Reset Variables and Set New Particle Weights to output Particle Vector
+  max_particle_weight = 0;
+  particles_.clear();
   particles_ = reduced_particle_vec;
 
 }
@@ -416,10 +383,10 @@ void ParticleFilter::Predict(const Eigen::Vector3d &odom_cur) {
   // Calculate Difference Between New and Old Odom Readings
 
   // Variance Parameters, set_parameter
-  double a1 = 8;  // 0.08 // angle 
-  double a2 = 8;  //0.01; // angle 
-  double a3 = 20;  //0.1; // trans
-  double a4 = 12;  //0.1; // trans
+  //double a1 = 8;  // 0.08 // angle 
+  //double a2 = 8;  //0.01; // angle 
+  //double a3 = 20;  //0.1; // trans
+  //double a4 = 12;  //0.1; // trans
 
   // Calculate Relative Odometry
   double del_x = odom_cur(0)-odom_old(0);
@@ -440,9 +407,9 @@ void ParticleFilter::Predict(const Eigen::Vector3d &odom_cur) {
     for (int i {0}; i < particle_vector_length; i++) 
     {   
       // Calculate Variance
-      double rot1_hat_var = rng_.Gaussian(0,(a1*pow(del_rot_1,2) + a2*pow(del_trans,2)));
-      double trans_hat_var = rng_.Gaussian(0,(a3*pow(del_trans,2)+a4*pow(del_rot_1,2)+a4*pow(del_rot_2,2)));
-      double rot2_hat_var = rng_.Gaussian(0,(a1*pow(del_rot_1,2) + a2*pow(del_trans,2)));
+      double rot1_hat_var = 0;// rng_.Gaussian(0,(a1*pow(del_rot_1,2) + a2*pow(del_trans,2)));
+      double trans_hat_var = 0; //rng_.Gaussian(0,(a3*pow(del_trans,2)+a4*pow(del_rot_1,2)+a4*pow(del_rot_2,2)));
+      double rot2_hat_var = 0; //rng_.Gaussian(0,(a1*pow(del_rot_1,2) + a2*pow(del_trans,2)));
 
       // Relative Odometry with some Variance
       double del_rot_1_hat = get_angle_diff(del_rot_1,rot1_hat_var);
@@ -536,7 +503,7 @@ void ParticleFilter::GetLocation(Eigen::Vector2f* loc_ptr,
     for (auto particles:particles_)
     {
       // Normalize Particle Weights
-      double particle_norm_weight = exp(particles.weight - max_particle_weight);
+      double particle_norm_weight = abs(exp(particles.weight - max_particle_weight));
       std::cout << "Particle_norm_weight: " << particle_norm_weight << std::endl;
 
       // Add All Normalized Particle Weights
@@ -549,7 +516,8 @@ void ParticleFilter::GetLocation(Eigen::Vector2f* loc_ptr,
       sum_sin_theta += sin(particles.angle) * particle_norm_weight;
       
     }
-
+    std::cout << "Total_particle_weight: " << total_particle_weight << std::endl;
+    
     // Averages for x, y, and theta;
     loc.x() = sum_x/total_particle_weight;
     loc.y() = sum_y/total_particle_weight;
