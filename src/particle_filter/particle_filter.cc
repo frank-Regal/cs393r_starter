@@ -56,6 +56,7 @@ namespace {
   int predict_steps {0};
   double max_particle_weight {0};
   int updates_done {0};
+  double distance_moved_over_predict {0};
 }
 
 namespace particle_filter {
@@ -115,12 +116,11 @@ void ParticleFilter::GetPredictedPointCloud(const Vector2f& loc,
   Eigen::Vector2f endpoint_of_max_distance_ray;
 
   // Step Size of Scan; set_parameter
-  int step_size_of_scan {40};
+  int step_size_of_scan {100};
 
   // Reduce the input vectors size to account for every 10th laser scan ray
   int length_of_scan_vec = num_ranges/step_size_of_scan;
 
-  //std::cout << "length_of_scan_vec: " << length_of_scan_vec << std::endl; //debug
   scan.resize(length_of_scan_vec);
 
   // Calcs: Predicted Beginning and End Points of Each Ray within Theoretical Laser Scan
@@ -244,7 +244,6 @@ void ParticleFilter::Update(const vector<float>& ranges,
   // Calculate Weight for Particle
   for(int i = 0; i < predicted_point_cloud_length; i++)
   {
-    //std::cout << "\n\n[Predicted Point Cloud: " << i << "]" << std::endl; //debug
     // Physical Laser Scanner Location is Offset From the Particle Location
     float laser_scanner_loc_x = particle.loc.x() + 0.2*cos(particle.angle);
     float laser_scanner_loc_y = particle.loc.y() + 0.2*sin(particle.angle);
@@ -259,7 +258,6 @@ void ParticleFilter::Update(const vector<float>& ranges,
 
     // Calculating Distance Comparison
     float delta_distance = particle_actual_distance - particle_theoretical_distance;
-    //std::cout << "\nDelta Distance: " << delta_distance << std::endl; //debug
 
     // Function for weighting the probability of particle being in the location found
     if(particle_actual_distance < range_min or particle_actual_distance > range_max)
@@ -269,12 +267,9 @@ void ParticleFilter::Update(const vector<float>& ranges,
     else if (particle_actual_distance > (particle_theoretical_distance + dlong))
       weight = exp(-(pow(dlong,2) / pow(ray_std_dev,2)));
     else
-    {
       weight = exp(-(pow(delta_distance,2) / pow(ray_std_dev,2)));
-      //std::cout << "****Actual is in the Guassian" << std::endl; // debug
-    }
+
     // Update Total Probability for this particle
-    //std::cout << "weight: " << weight << std::endl; //debug
     total_weight += weight;
   }
   particle.weight = gamma * total_weight;
@@ -283,81 +278,50 @@ void ParticleFilter::Update(const vector<float>& ranges,
 void ParticleFilter::Resample() {
   // Resample the particles, proportional to their weights.
   // The current particles are in the `particles_` variable. 
-
-  // Predefine the Number of Resamples; set_parameter
-  int num_of_resamples {50};
+  
+  // Predefine the Number of Resamples based on number of particles; set_parameter
+  int num_of_resamples {0};
+  num_of_resamples = particles_.size();
 
   // Initializations
-  std::vector <Particle> reduced_particle_vec; // return vector (vector of the kept particles)
-  double weight_sum {0};                       // comparison variable 
-  double total_weight {0};                     // total weight of all particles
-  int k {0};                                   // edge case variable
-  int input_vec_length = particles_.size();    // Get Length of Input Vector for Looping
-  std::vector <double> norm_particle_weight;   // norm particle vec
+  std::vector <Particle> reduced_particle_vec;      // return vector (vector of the kept particles)
+  std::vector <double> norm_particle_weight;        // norm particle vec
+  std::vector <double> bin_edges(num_of_resamples); // vector for low variance resample bins   
+  double total_weight {0};                          // total weight of all particles
+  int input_vec_length = particles_.size();         // Get Length of Input Vector for Looping
 
-  // Step 1: Normalize Weights
+  // Step 1: Normalize Particle Weights
   // Repopulate the weights with normalized weights (reference 51:00 Min in Lecture 2021.09.22)
   for (int k {0}; k < input_vec_length; k++)
   {
-    // particles_[k].weight = abs(exp(particles_[k].weight - max_particle_weight));
     norm_particle_weight.push_back(abs(exp(particles_[k].weight - max_particle_weight)));
     total_weight += norm_particle_weight[k];
+    bin_edges[k] = total_weight;
   }
 
-  // Step 2: Loop through each weight and resample
-  // Main Loop; RESAMPLE
-  for (int i {0}; i < num_of_resamples; i++)
-  {   
-      // reset comparison variable for bin navigation
-      weight_sum = 0;
+  // Step 2: Draw A Random Number
+  // get equidistant location for low variance resample
+  float equidistant_loc = total_weight/num_of_resamples;
+  if (equidistant_loc == 0)
+    return;
+  // get a random number
+  float random_num = rng_.UniformRandom(0, equidistant_loc);
 
-      // get a random number
-      float random_num = rng_.UniformRandom(0, total_weight);
-      //std::cout << "\n[Iter: " << i << "]\n Random Number: " << random_num << std::endl; // _____________ debug
+  // Step 3: Low Variance Resample
 
-      // loop through each particle weight/bucket
-      for (int j {0}; j < input_vec_length; j++)
-      {
-          // zero case
-          if (random_num == 0.00) 
-          {
-              reduced_particle_vec.push_back(particles_[0]);
-              //std::cout << " Particle (" << iter << ") equaled min; added to output vec" << std::endl; // debug
-              break;
-          }
-          // max case
-          else if (random_num == total_weight)
-          {
-              reduced_particle_vec.push_back(particles_[input_vec_length-1]);
-              //std::cout << " Particle (" << iter << ") equaled max; added to output vec" << std::endl; // debug
-              break;
-          }
-          // middle bucket cases; keep adding buckets if the random number is not equal
-          else if (random_num > weight_sum)
-          {
-              // Add a weight
-              weight_sum += norm_particle_weight[j];
-
-              // Check if random number is on the edge of two buckets
-              if (random_num == weight_sum)
-              {
-                  k = (norm_particle_weight[j] <= norm_particle_weight[j+1]) ? j+1 : j; 
-                  reduced_particle_vec.push_back(particles_[k]);
-                  //std::cout << " Particle (" << iter << ") on edge; added to output vec" << std::endl; // debug
-              }
-              // Check if random number is less than the next bucket, and add to output vector
-              else if (random_num < weight_sum)
-              {
-                  reduced_particle_vec.push_back(particles_[j]);
-                  //std::cout << " Particle (" << iter << ") added to output vec" << std::endl; // ________ debug
-              }
-          }
-      }
+  for (int m {0}; m < num_of_resamples; m++)
+  {
+    while (bin_edges[m] > random_num)
+    {
+      reduced_particle_vec.push_back(particles_[m]);
+      random_num += equidistant_loc;
+    }
   }
-  // Erase existing particles_ vector and fill with resampled particle vector (reduced_particle_vec)
-  particles_.erase(particles_.begin(), particles_.end());
+
+  // Step 4: Reset Variables and Set New Particle Weights to output Particle Vector
+  max_particle_weight = 0;
+  particles_.clear();
   particles_ = reduced_particle_vec;
-
 }
 
 void ParticleFilter::ObserveLaser(const vector<float>& ranges,
@@ -369,15 +333,14 @@ void ParticleFilter::ObserveLaser(const vector<float>& ranges,
   // A new laser scan observation is available (in the laser frame)
   // Call the Update and Resample steps as necessary.
 
-  // Check to make sure particles are populated, if not do nothing
+  // Check to make sure particles are populated and odom is initialized
   if (particles_.empty() || odom_initialized_ == false)
-  { 
+  {
     return;
   }
-  
-  
-  // Call Update Every n'th Predict
-  if (predict_steps == 5)
+
+  // Call Update Every n'th Predict; set_parameter
+  if (predict_steps >= 2 and distance_moved_over_predict > 0.1)
   {
     for(auto &particle : particles_)
     {
@@ -387,21 +350,22 @@ void ParticleFilter::ObserveLaser(const vector<float>& ranges,
       // Update Max Log Particle Weight Based On Return from Update
       if (particle.weight > max_particle_weight)
         max_particle_weight = particle.weight;
+    } 
+    // Call Resample Every n'th Update; set_parameter
+    if(updates_done == 3)
+    {
+      // Call to Resample
+      Resample();
+
+      // Reset Number of Updates Done
+      updates_done = 0;
     }
-    predict_steps = 0;  // Reset Number of Predicted Steps DOne
+
+    predict_steps = 0;  // Reset Number of Predicted Steps Done
+    distance_moved_over_predict = 0; // reset distance traveled
     updates_done++;     // Increment how many times Update has been called to determine when to call Resample
   }
 
-  // Call Resample Every n'th Update
-  if(updates_done == 10)
-  {
-    // Call to Resample
-    Resample();
-
-    // Reset Number of Updates Done
-    updates_done = 0;
-  }
-  
 }
 
 
@@ -416,10 +380,10 @@ void ParticleFilter::Predict(const Eigen::Vector3d &odom_cur) {
   // Calculate Difference Between New and Old Odom Readings
 
   // Variance Parameters, set_parameter
-  double a1 = 8;  // 0.08 // angle 
-  double a2 = 8;  //0.01; // angle 
-  double a3 = 20;  //0.1; // trans
-  double a4 = 12;  //0.1; // trans
+  double a1 = 3;  // 0.08 // angle 
+  double a2 = 3;  //0.01; // angle 
+  double a3 = 7;  //0.1; // trans
+  double a4 = 7;  //0.1; // trans
 
   // Calculate Relative Odometry
   double del_x = odom_cur(0)-odom_old(0);
@@ -436,7 +400,6 @@ void ParticleFilter::Predict(const Eigen::Vector3d &odom_cur) {
 
   if (odom_initialized_ == true and del_trans != 0 and del_trans < 1 and del_rot < M_PI/2 and del_rot > -M_PI/2)
   {
-    // std::cout << "\n\nPREDICT CALLED" << std::endl;
     for (int i {0}; i < particle_vector_length; i++) 
     {   
       // Calculate Variance
@@ -459,7 +422,14 @@ void ParticleFilter::Predict(const Eigen::Vector3d &odom_cur) {
       odom_old(1) = odom_cur(1); // y odom
       odom_old(2) = odom_cur(2); // angle odom
     }
-    predict_steps++;             // keep track of how many predicts we did for call to update
+
+           
+    // Make sure we moved a large enough distance to update
+    distance_moved_over_predict += del_trans; 
+
+    // keep track of how many predicts we did for call to update
+    predict_steps++;   
+
   }
   else
   {
