@@ -53,7 +53,7 @@ class ParticleFilter {
                     float angle_max);
 
   // Predict particle motion based on odometry.
-  void Predict(const Eigen::Vector3d &odom_cur);
+  void Predict(const Eigen::Vector2f &odom_cur_pos, const float &odom_cur_angle);
 
   // Initialize the robot location.
   void Initialize(const std::string& map_file,
@@ -101,11 +101,12 @@ class ParticleFilter {
   util_random::Random rng_;
 
   // Previous odometry-reported locations.
-  Eigen::Vector3d odom_old;
-  Eigen::Vector2f prev_odom_loc_;
-  float prev_odom_angle_;
+  Eigen::Vector2f odom_old_pos;
+  float odom_old_angle;
   bool odom_initialized_;
   bool predict_step_done_;
+
+
 };
 }  // namespace slam
 

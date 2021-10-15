@@ -81,9 +81,8 @@ double ParticleFilter::get_angle_diff(double a, double b)
 
 
 ParticleFilter::ParticleFilter() :
-    odom_old(0,0,0),
-    prev_odom_loc_(0, 0), // not needed CHECK
-    prev_odom_angle_(0),  // not needed CHECK
+    odom_old_pos(0,0),
+    odom_old_angle {0},
     odom_initialized_(false),
     predict_step_done_(false) {}
 
@@ -338,9 +337,9 @@ void ParticleFilter::ObserveLaser(const vector<float>& ranges,
   {
     return;
   }
-
+  std::cout <<"distance_moved_over_predict: "<< distance_moved_over_predict << std::endl;
   // Call Update Every n'th Predict; set_parameter
-  if (predict_steps >= 2 and distance_moved_over_predict > 0.1)
+  if (predict_steps >= 2 and distance_moved_over_predict > 0.07)
   {
     for(auto &particle : particles_)
     {
@@ -369,82 +368,56 @@ void ParticleFilter::ObserveLaser(const vector<float>& ranges,
 }
 
 
-void ParticleFilter::Predict(const Eigen::Vector3d &odom_cur) {
+void ParticleFilter::Predict(const Eigen::Vector2f &odom_cur_pos, const float &odom_cur_angle ) {
   
   // Implement the predict step of the particle filter here.
   // A new odometry value is available (in the odom frame)
   // Implement the motion model predict step here, to propagate the particles
   // forward based on odometry.
-  
-  // Reference: Table 5.6 in Sebastian Thrun, Wolfram Bugard & Dieter Fox
-  // Calculate Difference Between New and Old Odom Readings
 
   // Capture Length of Particle Vector
   int particle_vector_length = particles_.size();
+  Eigen::Vector2f variance;
+  float variance_angle;
 
-  // Variance Parameters, set_parameter
-  double a1 = 1.5;  // 0.08 // angle 
-  double a2 = 1.5;  //0.01; // angle 
-  double a3 = 7;  //0.1; // trans
-  double a4 = 7;  //0.1; // trans
+  // // Variance Parameters, set_parameter
+  double a1 = 0.4;  // 0.08 // angle 
+  double a2 = 0.02;  //0.01; // angle 
+  double a3 = 0.2;  //0.1; // trans
+  double a4 = 0.4;  //0.1; // trans
 
-  // check to make sure forward motion
-  if (abs(odom_cur(0)) < abs(odom_old(0)) or abs(odom_cur(1)) < abs(odom_old(1)))
-  {
-    
-    double del_x = abs(odom_cur(0)-odom_old(0));
+  // Reference CS393r Lecture Slides "06 - Particle Filters" Slides 26 & 27
+  // Location Translation to Baselink
+  Eigen::Vector2f delT_baselink = Eigen::Rotation2Df(-odom_old_angle) * (odom_cur_pos - odom_old_pos);
+  // Angle Distance to Baselink
+  float delAngle_baselink = math_util::AngleDist(odom_cur_angle,odom_old_angle);
 
-    for (int i {0}; i < particle_vector_length; i++)
-    {
-      particles_[i].loc.x() = particles_[i].loc.x() - del_x;
-      particles_[i].angle = particles_[i].angle;
-    }
 
-    odom_old(0) = odom_cur(0);  // x odom
-    odom_old(1) = odom_cur(1);  // y odom
-    odom_old(2) = odom_cur(2);  // angle odom
-
-    std::cout << "less than" << std::endl;
-    return;
-  }
-
-  // Calculate Relative Odometry
-  double del_x = odom_cur(0)-odom_old(0);
-  double del_y = odom_cur(1)-odom_old(1);
-  double del_rot = odom_cur(2)-odom_old(2);
-
-  // Calculate Deltas based on Odom Data
-  double del_rot_1 = atan2(del_y,del_x) - odom_old(2);
-  double del_trans = sqrt(pow(del_y,2) + pow(del_x,2));
-  double del_rot_2 = odom_cur(2) - odom_old(2) - del_rot_1;
-
-  if (odom_initialized_ == true and del_trans != 0 and del_trans < 1 and del_rot < M_PI/2 and del_rot > -M_PI/2)
+  if (odom_initialized_ and delT_baselink.norm() < 1)
   {
     for (int i {0}; i < particle_vector_length; i++) 
     {   
-      // Calculate Variance
-      double rot1_hat_var = rng_.Gaussian(0,(a1*pow(del_rot_1,2) + a2*pow(del_trans,2)));
-      double trans_hat_var = rng_.Gaussian(0,(a3*pow(del_trans,2)+a4*pow(del_rot_1,2)+a4*pow(del_rot_2,2)));
-      double rot2_hat_var = rng_.Gaussian(0,(a1*pow(del_rot_1,2) + a2*pow(del_trans,2)));
 
-      // Relative Odometry with some Variance
-      double del_rot_1_hat = get_angle_diff(del_rot_1,rot1_hat_var);
-      double del_trans_hat = del_trans - trans_hat_var;
-      double del_rot_2_hat = get_angle_diff(del_rot_2,rot2_hat_var);
+        Eigen::Vector2f delT_map = Eigen::Rotation2Df(particles_[i].angle)*delT_baselink;
 
-      // Predicted State_t
-      particles_[i].loc.x() = particles_[i].loc.x() + del_trans_hat*cos(particles_[i].angle+ del_rot_1_hat);
-      particles_[i].loc.y() = particles_[i].loc.y() + del_trans_hat*sin(particles_[i].angle + del_rot_1_hat);
-      particles_[i].angle = particles_[i].angle + del_rot_1_hat + del_rot_2_hat;
+        // Add Variance to deltas
+        variance.x() = rng_.Gaussian(0, ( a1*delT_map.norm()+ a2*abs(delAngle_baselink) )); 
+        variance.y() = rng_.Gaussian(0, ( a1*delT_map.norm() + a2*abs(delAngle_baselink) )); 
+        variance_angle = rng_.Gaussian(0, ( a3*delT_map.norm() + a4*abs(delAngle_baselink) )); 
 
-      // Set Current Odom to the Old Odom
-      odom_old(0) = odom_cur(0); // x odom
-      odom_old(1) = odom_cur(1); // y odom
-      odom_old(2) = odom_cur(2); // angle odom
+        // Update Particle Location
+        particles_[i].loc += delT_map + variance;
+
+        // Update Particle Angle
+        particles_[i].angle += delAngle_baselink + variance_angle;
+        
+        // Set current odom values to previous values for next call to predict
+        odom_old_pos = odom_cur_pos;
+        odom_old_angle = odom_cur_angle;
     }
 
     // Make sure we moved a large enough distance to update
-    distance_moved_over_predict += del_trans; 
+    distance_moved_over_predict += delT_baselink.norm(); 
 
     // keep track of how many predicts we did for call to update
     predict_steps++;   
@@ -453,9 +426,8 @@ void ParticleFilter::Predict(const Eigen::Vector3d &odom_cur) {
   else
   {
     // Set current odom values to previous values for next call to predict
-    odom_old(0) = odom_cur(0);  // x odom
-    odom_old(1) = odom_cur(1);  // y odom
-    odom_old(2) = odom_cur(2);  // angle odom
+    odom_old_pos = odom_cur_pos;
+    odom_old_angle = odom_cur_angle;
   }
 }
 
@@ -483,7 +455,7 @@ void ParticleFilter::Initialize(const string& map_file,
   for(int i {0}; i < num_of_init_particle_cloud; i++){
     init_particle_cloud.loc.x() = loc.x() + rng_.Gaussian(0.0, 0.75);
     init_particle_cloud.loc.y() = loc.y() + rng_.Gaussian(0.0, 0.5);
-    init_particle_cloud.angle = angle + rng_.Gaussian(0.0, 0.3);
+    init_particle_cloud.angle = angle + rng_.Gaussian(0.0, 0.1);
     init_particle_cloud.weight = 0;
     particles_.push_back(init_particle_cloud);
   }
