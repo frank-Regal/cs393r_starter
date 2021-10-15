@@ -115,7 +115,7 @@ void ParticleFilter::GetPredictedPointCloud(const Vector2f& loc,
   Eigen::Vector2f endpoint_of_max_distance_ray;
 
   // Step Size of Scan; set_parameter
-  int step_size_of_scan {50};
+  int step_size_of_scan {75};
 
   // Reduce the input vectors size to account for every 10th laser scan ray
   int length_of_scan_vec = num_ranges/step_size_of_scan;
@@ -234,7 +234,7 @@ void ParticleFilter::Update(const vector<float>& ranges,
   // float max_range_with_tuning = range_max - range_max * max_dist_tuning;
 
   // Standard deviation of Physical LIDAR System; set_parameter
-  double ray_std_dev = 0.1;
+  double ray_std_dev = 0.15;
 
   // Reset variables between each point cloud
   float weight {0};
@@ -337,7 +337,7 @@ void ParticleFilter::ObserveLaser(const vector<float>& ranges,
   {
     return;
   }
-  std::cout <<"distance_moved_over_predict: "<< distance_moved_over_predict << std::endl;
+
   // Call Update Every n'th Predict; set_parameter
   if (predict_steps >= 2 and distance_moved_over_predict > 0.07)
   {
@@ -382,9 +382,9 @@ void ParticleFilter::Predict(const Eigen::Vector2f &odom_cur_pos, const float &o
 
   // // Variance Parameters, set_parameter
   double a1 = 0.4;  // 0.08 // angle 
-  double a2 = 0.02;  //0.01; // angle 
+  double a2 = 0.01;  //0.01; // angle 
   double a3 = 0.2;  //0.1; // trans
-  double a4 = 0.4;  //0.1; // trans
+  double a4 = 0.01;  //0.1; // trans
 
   // Reference CS393r Lecture Slides "06 - Particle Filters" Slides 26 & 27
   // Location Translation to Baselink
@@ -455,7 +455,7 @@ void ParticleFilter::Initialize(const string& map_file,
   for(int i {0}; i < num_of_init_particle_cloud; i++){
     init_particle_cloud.loc.x() = loc.x() + rng_.Gaussian(0.0, 0.75);
     init_particle_cloud.loc.y() = loc.y() + rng_.Gaussian(0.0, 0.5);
-    init_particle_cloud.angle = angle + rng_.Gaussian(0.0, 0.1);
+    init_particle_cloud.angle = angle + rng_.Gaussian(0.0, 0.01);
     init_particle_cloud.weight = 0;
     particles_.push_back(init_particle_cloud);
   }
