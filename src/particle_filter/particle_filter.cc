@@ -116,7 +116,7 @@ void ParticleFilter::GetPredictedPointCloud(const Vector2f& loc,
   Eigen::Vector2f endpoint_of_max_distance_ray;
 
   // Step Size of Scan; set_parameter
-  int step_size_of_scan {100};
+  int step_size_of_scan {50};
 
   // Reduce the input vectors size to account for every 10th laser scan ray
   int length_of_scan_vec = num_ranges/step_size_of_scan;
@@ -379,11 +379,34 @@ void ParticleFilter::Predict(const Eigen::Vector3d &odom_cur) {
   // Reference: Table 5.6 in Sebastian Thrun, Wolfram Bugard & Dieter Fox
   // Calculate Difference Between New and Old Odom Readings
 
+  // Capture Length of Particle Vector
+  int particle_vector_length = particles_.size();
+
   // Variance Parameters, set_parameter
-  double a1 = 3;  // 0.08 // angle 
-  double a2 = 3;  //0.01; // angle 
+  double a1 = 1.5;  // 0.08 // angle 
+  double a2 = 1.5;  //0.01; // angle 
   double a3 = 7;  //0.1; // trans
   double a4 = 7;  //0.1; // trans
+
+  // check to make sure forward motion
+  if (abs(odom_cur(0)) < abs(odom_old(0)) or abs(odom_cur(1)) < abs(odom_old(1)))
+  {
+    
+    double del_x = abs(odom_cur(0)-odom_old(0));
+
+    for (int i {0}; i < particle_vector_length; i++)
+    {
+      particles_[i].loc.x() = particles_[i].loc.x() - del_x;
+      particles_[i].angle = particles_[i].angle;
+    }
+
+    odom_old(0) = odom_cur(0);  // x odom
+    odom_old(1) = odom_cur(1);  // y odom
+    odom_old(2) = odom_cur(2);  // angle odom
+
+    std::cout << "less than" << std::endl;
+    return;
+  }
 
   // Calculate Relative Odometry
   double del_x = odom_cur(0)-odom_old(0);
@@ -394,9 +417,6 @@ void ParticleFilter::Predict(const Eigen::Vector3d &odom_cur) {
   double del_rot_1 = atan2(del_y,del_x) - odom_old(2);
   double del_trans = sqrt(pow(del_y,2) + pow(del_x,2));
   double del_rot_2 = odom_cur(2) - odom_old(2) - del_rot_1;
-
-  // Capture Length of Particle Vector
-  int particle_vector_length = particles_.size();
 
   if (odom_initialized_ == true and del_trans != 0 and del_trans < 1 and del_rot < M_PI/2 and del_rot > -M_PI/2)
   {
@@ -423,7 +443,6 @@ void ParticleFilter::Predict(const Eigen::Vector3d &odom_cur) {
       odom_old(2) = odom_cur(2); // angle odom
     }
 
-           
     // Make sure we moved a large enough distance to update
     distance_moved_over_predict += del_trans; 
 
@@ -458,7 +477,7 @@ void ParticleFilter::Initialize(const string& map_file,
   Particle init_particle_cloud;
   odom_initialized_ = true;
   predict_steps = 1;
-  int num_of_init_particle_cloud = 50;  // set_parameter; number of particles to initialize with
+  int num_of_init_particle_cloud = 70;  // set_parameter; number of particles to initialize with
 
   // set_parameter for Gaussian standard deviation and mean
   for(int i {0}; i < num_of_init_particle_cloud; i++){
