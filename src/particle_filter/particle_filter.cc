@@ -15,9 +15,12 @@
 /*!
 \file    particle-filter.cc
 \brief   Particle Filter Starter Code
-\author  Joydeep Biswas, (C) 2019
+\author  Adopted From: Joydeep Biswas, (C) 2019
 */
 //========================================================================
+
+
+
 
 #include <algorithm>
 #include <cmath>
@@ -115,7 +118,7 @@ void ParticleFilter::GetPredictedPointCloud(const Vector2f& loc,
   Eigen::Vector2f endpoint_of_max_distance_ray;
 
   // Step Size of Scan; set_parameter
-  int step_size_of_scan {75};
+  int step_size_of_scan {110}; // 75 best guess
 
   // Reduce the input vectors size to account for every 10th laser scan ray
   int length_of_scan_vec = num_ranges/step_size_of_scan;
@@ -339,7 +342,7 @@ void ParticleFilter::ObserveLaser(const vector<float>& ranges,
   }
 
   // Call Update Every n'th Predict; set_parameter
-  if (predict_steps >= 2 and distance_moved_over_predict > 0.07)
+  if (predict_steps >= 1 and distance_moved_over_predict > 0.01)
   {
     for(auto &particle : particles_)
     {
@@ -351,7 +354,7 @@ void ParticleFilter::ObserveLaser(const vector<float>& ranges,
         max_particle_weight = particle.weight;
     } 
     // Call Resample Every n'th Update; set_parameter
-    if(updates_done == 3)
+    if(updates_done == 7)
     {
       // Call to Resample
       Resample();
@@ -382,15 +385,15 @@ void ParticleFilter::Predict(const Eigen::Vector2f &odom_cur_pos, const float &o
 
   // // Variance Parameters, set_parameter
   double a1 = 0.4;  // 0.08 // angle 
-  double a2 = 0.01;  //0.01; // angle 
+  double a2 = 0.1;  //0.01; // angle 
   double a3 = 0.2;  //0.1; // trans
-  double a4 = 0.01;  //0.1; // trans
+  double a4 = 0.1;  //0.1; // trans
 
   // Reference CS393r Lecture Slides "06 - Particle Filters" Slides 26 & 27
   // Location Translation to Baselink
   Eigen::Vector2f delT_baselink = Eigen::Rotation2Df(-odom_old_angle) * (odom_cur_pos - odom_old_pos);
   // Angle Distance to Baselink
-  float delAngle_baselink = math_util::AngleDist(odom_cur_angle,odom_old_angle);
+  float delAngle_baselink = math_util::AngleDiff(odom_cur_angle,odom_old_angle);
 
 
   if (odom_initialized_ and delT_baselink.norm() < 1)
@@ -449,13 +452,13 @@ void ParticleFilter::Initialize(const string& map_file,
   Particle init_particle_cloud;
   odom_initialized_ = true;
   predict_steps = 1;
-  int num_of_init_particle_cloud = 70;  // set_parameter; number of particles to initialize with
+  int num_of_init_particle_cloud = 50;  // set_parameter; number of particles to initialize with
 
   // set_parameter for Gaussian standard deviation and mean
   for(int i {0}; i < num_of_init_particle_cloud; i++){
     init_particle_cloud.loc.x() = loc.x() + rng_.Gaussian(0.0, 0.75);
     init_particle_cloud.loc.y() = loc.y() + rng_.Gaussian(0.0, 0.5);
-    init_particle_cloud.angle = angle + rng_.Gaussian(0.0, 0.01);
+    init_particle_cloud.angle = angle + rng_.Gaussian(0.0, 0.1);
     init_particle_cloud.weight = 0;
     particles_.push_back(init_particle_cloud);
   }
