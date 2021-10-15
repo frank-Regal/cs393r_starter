@@ -13,9 +13,13 @@
 //  If not, see <http://www.gnu.org/licenses/>.
 //========================================================================
 /*!
-\file    particle-filter.cc
-\brief   Particle Filter Starter Code
-\author  Adopted From: Joydeep Biswas, (C) 2019
+\file:          particle-filter.cc
+\brief:         Particle Filter for CS393r Autonomous Robots
+\university:    The University of Texas at Austin
+\class:         CS 393r Autonomous Robots
+\assignment:    Assignment 2 - Particle Filter
+\author:        Mary Tebben & Frank Regal
+\adopted from:  Dr. Joydeep Biswas
 */
 //========================================================================
 
@@ -33,14 +37,12 @@
 #include "shared/math/line2d.h"
 #include "shared/math/math_util.h"
 #include "shared/util/timer.h"
-
 #include "config_reader/config_reader.h"
 #include "particle_filter.h"
-
 #include "vector_map/vector_map.h"
+#include <math.h>
 
 #define _USE_MATH_DEFINES
-#include <math.h>
 
 using geometry::line2f;
 using std::cout;
@@ -54,7 +56,6 @@ using vector_map::VectorMap;
 
 DEFINE_double(num_particles, 50, "Number of particles");
 
-
 namespace {
   int predict_steps {0};
   double max_particle_weight {0};
@@ -65,23 +66,6 @@ namespace {
 namespace particle_filter {
 
 config_reader::ConfigReader config_reader_({"config/particle_filter.lua"});
-
-// helper function
-double ParticleFilter::get_angle_diff(double a, double b)
-{
-  double theta = a-b;
-  while (theta < -M_PI)
-  {
-    theta += 2*M_PI;
-  }
-  while (theta > M_PI)
-  {
-    theta -= 2*M_PI;
-  }
-
-  return theta;
-}
-
 
 ParticleFilter::ParticleFilter() :
     odom_old_pos(0,0),
@@ -123,9 +107,10 @@ void ParticleFilter::GetPredictedPointCloud(const Vector2f& loc,
   // Reduce the input vectors size to account for every 10th laser scan ray
   int length_of_scan_vec = num_ranges/step_size_of_scan;
 
+  // Make Scan vector the size of input vector
   scan.resize(length_of_scan_vec);
 
-  // Calcs: Predicted Beginning and End Points of Each Ray within Theoretical Laser Scan
+  // Step 1: Predict Beginning and End Points of Each Ray within Theoretical Laser Scan
   // Points for Laser Scanner in Space using Distance between baselink and laser scanner on physical robot to be 0.2 meters
   float laser_scanner_loc_x = loc.x() + 0.2*cos(angle);
   float laser_scanner_loc_y = loc.y() + 0.2*sin(angle);
@@ -137,14 +122,14 @@ void ParticleFilter::GetPredictedPointCloud(const Vector2f& loc,
   // Build Vector of Laser Scan Angles
   std::vector <float> predicted_scan_angles;
 
-  // Fill a Vector of each Scan Angle
+  // Step 2: Fill a Vector of each Scan Angle
   for (int i {0}; i < length_of_scan_vec; i++)
   {
     parsed_angle += ((angle_max-angle_min)/length_of_scan_vec);
     predicted_scan_angles.push_back(parsed_angle);
   }
 
-  // loop through each theoretical scan
+  // Step 3: loop through each theoretical scan
   for (int j {0}; j < length_of_scan_vec; j++)
   {
     // Initialize the points of the predicted laser scan rays
@@ -199,11 +184,6 @@ void ParticleFilter::Update(const vector<float>& ranges,
                             float angle_min,
                             float angle_max,
                             Particle* p_ptr) {
-  // Implement the update step of the particle filter here.
-  // You will have to use the `GetPredictedPointCloud` to predict the expected
-  // observations for each particle, and assign weights to the particles based
-  // on the observation likelihood computed by relating the observation to the
-  // predicted point cloud.
 
   // Setting Up Output Variable
   Particle& particle = *p_ptr;
@@ -232,14 +212,10 @@ void ParticleFilter::Update(const vector<float>& ranges,
   double dlong = 0.5;
   double gamma = 0.8;
 
-  // // Adding tuning params for Min and Max Ranges of Physical Laser Scanner
-  // float min_range_with_tuning = range_min + range_min * min_dist_tuning;
-  // float max_range_with_tuning = range_max - range_max * max_dist_tuning;
-
   // Standard deviation of Physical LIDAR System; set_parameter
   double ray_std_dev = 0.15;
 
-  // Reset variables between each point cloud
+  // Reset variables between each input point cloud
   float weight {0};
   float total_weight {0};
 
@@ -250,10 +226,10 @@ void ParticleFilter::Update(const vector<float>& ranges,
     float laser_scanner_loc_x = particle.loc.x() + 0.2*cos(particle.angle);
     float laser_scanner_loc_y = particle.loc.y() + 0.2*sin(particle.angle);
 
-    // Distance laser scanner found to be from obstacle (actual distance)
+    // Distance laser scanner actually found from obstacle (ACTUAL)
     float particle_actual_distance = resized_ranges[i];
 
-    // Calculate distance between the laser scanner and the returned point cloud location (theoretical distance)
+    // Calculate distance between the laser scanner and the returned point cloud location (THEORETICAL)
     float theoretical_dist_x = predicted_point_cloud[i].x() - laser_scanner_loc_x;
     float theoretical_dist_y = predicted_point_cloud[i].y() - laser_scanner_loc_y;
     float particle_theoretical_distance = sqrt(pow(theoretical_dist_x, 2)+pow(theoretical_dist_y, 2));
@@ -261,7 +237,7 @@ void ParticleFilter::Update(const vector<float>& ranges,
     // Calculating Distance Comparison
     float delta_distance = particle_actual_distance - particle_theoretical_distance;
 
-    // Function for weighting the probability of particle being in the location found
+    // (MAIN WEIGHT FUNCTION) Function for weighting the probability of each particle being in the location found
     if(particle_actual_distance < range_min or particle_actual_distance > range_max)
       continue;
     else if (particle_actual_distance < (particle_theoretical_distance - dshort))
@@ -274,15 +250,21 @@ void ParticleFilter::Update(const vector<float>& ranges,
     // Update Total Probability for this particle
     total_weight += weight;
   }
+
+  // Set particle weight to a scaled total weight for tuning. Gamma set at begginning of method.
   particle.weight = gamma * total_weight;
 }
 
 void ParticleFilter::Resample() {
   // Resample the particles, proportional to their weights.
-  // The current particles are in the `particles_` variable. 
+  // The current particles are in the `particles_` variable.
+
+  // **** Low Variance Resampling Method **** 
   
+  // Reset
+  int num_of_resamples {0}; 
+
   // Predefine the Number of Resamples based on number of particles; set_parameter
-  int num_of_resamples {0};
   num_of_resamples = particles_.size();
 
   // Initializations
@@ -293,7 +275,7 @@ void ParticleFilter::Resample() {
   int input_vec_length = particles_.size();         // Get Length of Input Vector for Looping
 
   // Step 1: Normalize Particle Weights
-  // Repopulate the weights with normalized weights (reference 51:00 Min in Lecture 2021.09.22)
+  // Repopulate the weights with normalized weights (Reference 51:00 min in 2021.09.22 Lecture)
   for (int k {0}; k < input_vec_length; k++)
   {
     norm_particle_weight.push_back(abs(exp(particles_[k].weight - max_particle_weight)));
@@ -304,13 +286,15 @@ void ParticleFilter::Resample() {
   // Step 2: Draw A Random Number
   // get equidistant location for low variance resample
   float equidistant_loc = total_weight/num_of_resamples;
+
+  // Check to ensure update was run
   if (equidistant_loc == 0)
     return;
-  // get a random number
+  
+  // Get a random number
   float random_num = rng_.UniformRandom(0, equidistant_loc);
 
-  // Step 3: Low Variance Resample
-
+  // Step 3: Low Variance Resample Method, starting from first bin
   for (int m {0}; m < num_of_resamples; m++)
   {
     while (bin_edges[m] > random_num)
@@ -337,9 +321,7 @@ void ParticleFilter::ObserveLaser(const vector<float>& ranges,
 
   // Check to make sure particles are populated and odom is initialized
   if (particles_.empty() || odom_initialized_ == false)
-  {
     return;
-  }
 
   // Call Update Every n'th Predict; set_parameter
   if (predict_steps >= 1 and distance_moved_over_predict > 0.01)
@@ -353,30 +335,27 @@ void ParticleFilter::ObserveLaser(const vector<float>& ranges,
       if (particle.weight > max_particle_weight)
         max_particle_weight = particle.weight;
     } 
+
     // Call Resample Every n'th Update; set_parameter
     if(updates_done == 7)
     {
-      // Call to Resample
+      // Call to Resample, fills `particles_` vector with new weights
       Resample();
 
       // Reset Number of Updates Done
       updates_done = 0;
     }
 
-    predict_steps = 0;  // Reset Number of Predicted Steps Done
-    distance_moved_over_predict = 0; // reset distance traveled
-    updates_done++;     // Increment how many times Update has been called to determine when to call Resample
+    predict_steps = 0;                // Reset Number of Predicted Steps Done
+    distance_moved_over_predict = 0;  // Reset Distance Traveled
+    updates_done++;                   // Increment how many times Update has been called to determine when to call Resample
   }
 
 }
 
-
 void ParticleFilter::Predict(const Eigen::Vector2f &odom_cur_pos, const float &odom_cur_angle ) {
-  
-  // Implement the predict step of the particle filter here.
-  // A new odometry value is available (in the odom frame)
-  // Implement the motion model predict step here, to propagate the particles
-  // forward based on odometry.
+
+  // Reference CS393r Lecture Slides "06 - Particle Filters" Slides 26 & 27
 
   // Capture Length of Particle Vector
   int particle_vector_length = particles_.size();
@@ -389,18 +368,17 @@ void ParticleFilter::Predict(const Eigen::Vector2f &odom_cur_pos, const float &o
   double a3 = 0.2;  //0.1; // trans
   double a4 = 0.1;  //0.1; // trans
 
-  // Reference CS393r Lecture Slides "06 - Particle Filters" Slides 26 & 27
   // Location Translation to Baselink
   Eigen::Vector2f delT_baselink = Eigen::Rotation2Df(-odom_old_angle) * (odom_cur_pos - odom_old_pos);
   // Angle Distance to Baselink
   float delAngle_baselink = math_util::AngleDiff(odom_cur_angle,odom_old_angle);
 
-
+  // (MAIN FUNCTION) Calculate Variance and Predict Particles Forward
   if (odom_initialized_ and delT_baselink.norm() < 1)
   {
     for (int i {0}; i < particle_vector_length; i++) 
     {   
-
+        // Rotate from Baselink frame to Map frame
         Eigen::Vector2f delT_map = Eigen::Rotation2Df(particles_[i].angle)*delT_baselink;
 
         // Add Variance to deltas
@@ -419,16 +397,15 @@ void ParticleFilter::Predict(const Eigen::Vector2f &odom_cur_pos, const float &o
         odom_old_angle = odom_cur_angle;
     }
 
-    // Make sure we moved a large enough distance to update
+    // Make sure we moved a large enough distance to control update
     distance_moved_over_predict += delT_baselink.norm(); 
 
-    // keep track of how many predicts we did for call to update
+    // Keep track of how many predicts done to control update
     predict_steps++;   
-
   }
   else
   {
-    // Set current odom values to previous values for next call to predict
+    // Set current odom values to previous values for next call to predict if odom not initialized or distance traveled is greater than one
     odom_old_pos = odom_cur_pos;
     odom_old_angle = odom_cur_angle;
   }
@@ -454,7 +431,7 @@ void ParticleFilter::Initialize(const string& map_file,
   predict_steps = 1;
   int num_of_init_particle_cloud = 50;  // set_parameter; number of particles to initialize with
 
-  // set_parameter for Gaussian standard deviation and mean
+  // Create Random Particles based on zero mean Gaussian; set_parameter
   for(int i {0}; i < num_of_init_particle_cloud; i++){
     init_particle_cloud.loc.x() = loc.x() + rng_.Gaussian(0.0, 0.75);
     init_particle_cloud.loc.y() = loc.y() + rng_.Gaussian(0.0, 0.5);
@@ -501,7 +478,7 @@ void ParticleFilter::GetLocation(Eigen::Vector2f* loc_ptr,
       
     }
 
-    // Averages for x, y, and theta;
+    // (BEST ROBOT LOCATION ESTIMATE) Averages for x, y, and theta;
     loc.x() = sum_x/total_particle_weight;
     loc.y() = sum_y/total_particle_weight;
     angle = atan2(sum_sin_theta/total_particle_weight,sum_cos_theta/total_particle_weight);

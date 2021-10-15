@@ -13,9 +13,13 @@
 //  If not, see <http://www.gnu.org/licenses/>.
 //========================================================================
 /*!
-\file    particle-filter.h
-\brief   Particle Filter Interface
-\author  Joydeep Biswas, (C) 2018
+\file           particle-filter.h
+\brief          Particle Filter Interface
+\university:    The University of Texas at Austin
+\class:         CS 393r Autonomous Robots
+\assignment:    Assignment 2 - Particle Filter
+\author:        Mary Tebben & Frank Regal
+\adopted from:  Dr. Joydeep Biswas
 */
 //========================================================================
 

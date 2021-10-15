@@ -13,10 +13,13 @@
 //  If not, see <http://www.gnu.org/licenses/>.
 //========================================================================
 /*!
-\file    particle-filter-main.cc
-\brief   Main entry point for particle filter based
-         mobile robot localization
-\author  Joydeep Biswas, (C) 2019
+\file           particle-filter-main.cc
+\brief          Main entry point for particle filter based
+\university:    The University of Texas at Austin
+\class:         CS 393r Autonomous Robots
+\assignment:    Assignment 2 - Particle Filter
+\author:        Mary Tebben & Frank Regal
+\adopted from:  Dr. Joydeep Biswas
 */
 //========================================================================
 
@@ -197,10 +200,6 @@ void OdometryCallback(const nav_msgs::Odometry& msg) {
   float robot_angle(0);
   
   particle_filter_.GetLocation(&robot_loc, &robot_angle);
-
-  // std::cout << "\n\nrobot_loc, x: " << robot_loc.x()
-            // << "\nrobot_loc, y: " << robot_loc.y()
-            // << "\nrobot_angle: " << robot_angle << std::endl;
 
   amrl_msgs::Localization2DMsg localization_msg;
   localization_msg.pose.x = robot_loc.x();
