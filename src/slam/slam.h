@@ -30,6 +30,12 @@
 
 namespace slam {
 
+struct Particle {
+  Eigen::Vector2f loc;
+  float angle;
+  double weight;
+};
+
 class SLAM {
  public:
   // Default Constructor.
@@ -41,6 +47,9 @@ class SLAM {
                     float range_max,
                     float angle_min,
                     float angle_max);
+
+  // Possible robot poses
+  void MotionModel(Eigen::Vector2f loc, float angle, float dist, float delta_angle);
 
   // Observe new odometry-reported location.
   void ObserveOdometry(const Eigen::Vector2f& odom_loc,
@@ -58,6 +67,19 @@ class SLAM {
   Eigen::Vector2f prev_odom_loc_;
   float prev_odom_angle_;
   bool odom_initialized_;
+
+  // tunable parameters:
+  float a1_;
+  float a2_;
+  float a3_;
+  float a4_;
+
+  float dist_between_CSM_;
+  float angle_between_CSM_;
+
+  float resolution_x_;
+  float resolution_y_;
+  float resolution_angle_;
 };
 }  // namespace slam
 
