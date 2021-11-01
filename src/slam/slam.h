@@ -74,12 +74,12 @@ class SLAM {
   float a3_;
   float a4_;
 
-  float dist_between_CSM_;
-  float angle_between_CSM_;
+  float min_dist_between_CSM_;
+  float min_angle_between_CSM_;
 
-  float resolution_x_;
-  float resolution_y_;
-  float resolution_angle_;
+  float num_x_;
+  float num_y_;
+  float num_angle_;
 };
 }  // namespace slam
 

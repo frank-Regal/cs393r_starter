@@ -62,12 +62,12 @@ SLAM::SLAM() :
     a3_(0.4), // angle
     a4_(0.1), // angle   //a's taken from particle_filter.cc
 
-    dist_between_CSM_(0.5),  // meters
-    angle_between_CSM_(30*M_PI/180), // radians
+    min_dist_between_CSM_(0.5),  // meters
+    min_angle_between_CSM_(30*M_PI/180), // radians (30 deg)
 
-    resolution_x_(10),     // motion resolution in x
-    resolution_y_(10),     // motion resolution in y
-    resolution_angle_(30)  // motion resolution in angle
+    num_x_(10),     // motion resolution in x
+    num_y_(10),     // motion resolution in y
+    num_angle_(30)  // motion resolution in angle
     {}
 
 void SLAM::GetPose(Eigen::Vector2f* loc, float* angle) const {
@@ -95,14 +95,16 @@ void SLAM::MotionModel(Eigen::Vector2f loc, float angle, float dist, float delta
   float variance_angle = a3_*dist + a4_*abs(delta_angle);
 
   // Reference CS393r Lecture Slides "13 - Simultaneous Localization and Mapping" Slides 13 & 14
-  for(int i_x=0; i_x < resolution_x_; i_x++){
-    float deviation_x = variance_x*(2*i_x/(resolution_x_-1)-1);   // why? find equation
-    for(int i_y=0; i_y < resolution_y_; i_y++){
-      float deviation_y = variance_y*(2*i_y/(resolution_y_-1)-1); // why?
-      for(int i_angle=0; i_angle < resolution_angle_; i_angle++){
-        float deviation_angle = variance_angle*(2*i_angle/(resolution_angle_-1)-1); //why?
+  // Because we don't know where we are, where we start, which way we are facing
+  // all options have to be considered, hence 3D table
+  for(int i_x=0; i_x < num_x_; i_x++){
+    float deviation_x = variance_x + rng_.Gaussian(0, variance_x);   
+    for(int i_y=0; i_y < num_y_; i_y++){
+      float deviation_y = variance_y + rng_.Gaussian(0, variance_y); 
+      for(int i_angle=0; i_angle < num_angle_; i_angle++){
+        float deviation_angle = variance_angle + rng_.Gaussian(0, variance_angle); 
 
-        float new_location_x = loc.x() + deviation_x*cos(angle) - deviation_y*sin(angle); // + epsilon_x 
+        float new_location_x = loc.x() + deviation_x*cos(angle) - deviation_y*sin(angle); // + epsilon_x <- added in deviation
         float new_location_y = loc.y() + deviation_x*sin(angle) + deviation_y*cos(angle); // + epsilon_y
         float new_location_angle = angle + deviation_angle; // + epsilon_angle
 
@@ -126,7 +128,7 @@ void SLAM::ObserveOdometry(const Vector2f& odom_loc, const float odom_angle) {
   float delta_angle = AngleDiff(odom_angle, prev_odom_angle_);
   float dist = distance.norm();
 
-  if(dist > dist_between_CSM_ or abs(delta_angle) > angle_between_CSM_){
+  if(dist > min_dist_between_CSM_ or abs(delta_angle) > min_angle_between_CSM_){
     MotionModel(fill in);
     prev_odom_angle_ = odom_angle;
     prev_odom_loc_ = odom_loc;
