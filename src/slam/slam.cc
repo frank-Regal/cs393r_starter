@@ -15,7 +15,9 @@
 /*!
 \file    slam.cc
 \brief   SLAM Starter Code
-\author  Joydeep Biswas, (C) 2019
+\author  Frank Regal & Mary Tebben
+\class   cs393r Autonomous Robots
+\adapted from:  Joydeep Biswas, (C) 2019
 */
 //========================================================================
 
@@ -50,6 +52,9 @@ using vector_map::VectorMap;
 namespace slam {
 vector<Particle> particles_;
 
+// Most Likely Estimated pose
+MLE_Pose mle_pose_;
+
 
 SLAM::SLAM() :
     prev_odom_loc_(0, 0),
@@ -68,6 +73,8 @@ SLAM::SLAM() :
     num_x_(10),     // motion resolution in x
     num_y_(10),     // motion resolution in y
     num_angle_(30)  // motion resolution in angle
+
+    max_particle_cost_(0);
     {}
 
 void SLAM::GetPose(Eigen::Vector2f* loc, float* angle) const {
@@ -84,6 +91,51 @@ void SLAM::ObserveLaser(const vector<float>& ranges,
   // A new laser scan has been observed. Decide whether to add it as a pose
   // for SLAM. If decided to add, align it to the scan from the last saved pose,
   // and save both the scan and the optimized pose.
+
+
+}
+
+// Match up Laser Scans and Return the most likely estimated pose (mle_pose_)
+void SLAM::CorrelativeScanMatching(Observation &new_laser_scan) {
+  max_particle_cost_ = 0;
+
+  // *TODO* parse the incoming laser scan to be more manageable
+  parse_laser_scan(new_laser_scan);
+
+  // *TODO* convert to a point cloud  
+  std::vector<Eigen::Vector2f> new_point_cloud = convert_to_point_cloud(new_laser_scan);
+
+  // *TODO* Transfer new_laser_scan to Baselink of Robot
+  transform_to_robot_baselink(new_point_cloud);
+  
+  // Loop through all particles_ from motion model to find best pose
+  for (const auto &particle:particles_)
+  {
+    // cost of the laser scan
+    float observation_cost {0};
+
+    // transform this laser scan's point cloud to last pose's base_link
+    for (const auto &cur_points : new_point_cloud)
+    {
+      buid_map
+    }
+
+
+  }
+
+  
+
+  // Get size of parsed and transformed laser scan
+  int num_ranges = new_laser_scan.ranges->size();
+
+
+
+
+
+
+
+
+
 }
 
 void SLAM::MotionModel(Eigen::Vector2f loc, float angle, float dist, float delta_angle){
@@ -98,7 +150,7 @@ void SLAM::MotionModel(Eigen::Vector2f loc, float angle, float dist, float delta
   // Because we don't know where we are, where we start, which way we are facing
   // all options have to be considered, hence 3D table
   for(int i_x=0; i_x < num_x_; i_x++){
-    float deviation_x = variance_x + rng_.Gaussian(0, variance_x);   
+    float deviation_x = variance_x + rng_.Gaussian(0, variance_x);  // Check if correct?
     for(int i_y=0; i_y < num_y_; i_y++){
       float deviation_y = variance_y + rng_.Gaussian(0, variance_y); 
       for(int i_angle=0; i_angle < num_angle_; i_angle++){
@@ -129,7 +181,7 @@ void SLAM::ObserveOdometry(const Vector2f& odom_loc, const float odom_angle) {
   float dist = distance.norm();
 
   if(dist > min_dist_between_CSM_ or abs(delta_angle) > min_angle_between_CSM_){
-    MotionModel(fill in);
+    MotionModel(mle_pose_.loc, mle_pose_.angle, distance, delta_angle);
     prev_odom_angle_ = odom_angle;
     prev_odom_loc_ = odom_loc;
   }

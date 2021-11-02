@@ -36,6 +36,14 @@ struct Particle {
   double weight;
 };
 
+struct Observation {
+  std::vector<float>& ranges;
+  float range_min;
+  float range_max;
+  float angle_min;
+  float angle_max;
+};
+
 class SLAM {
  public:
   // Default Constructor.
@@ -60,6 +68,9 @@ class SLAM {
 
   // Get latest robot pose.
   void GetPose(Eigen::Vector2f* loc, float* angle) const;
+
+  // Succesive Scan Matching Method
+  void SLAM::CorrelativeScanMatching(const Observation &new_laser_scan)
 
  private:
 
