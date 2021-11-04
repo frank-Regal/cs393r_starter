@@ -53,7 +53,7 @@ namespace slam {
 vector<Particle> particles_;
 
 // Most Likely Estimated pose
-MLE_Pose mle_pose_;
+Particle mle_pose_;
 
 
 SLAM::SLAM() :
@@ -61,23 +61,29 @@ SLAM::SLAM() :
     prev_odom_angle_(0),
     odom_initialized_(false), 
     
-    // tunable parameters:
+    // tunable parameters: CSM
+    max_particle_cost_(0),
+
+    // tunable parameters: MotionModel
     a1_(0.2), // trans 
     a2_(0.1), // trans 
     a3_(0.4), // angle
     a4_(0.1), // angle   //a's taken from particle_filter.cc
 
-    min_dist_between_CSM_(0.5),  // meters
-    min_angle_between_CSM_(30*M_PI/180), // radians (30 deg)
-
     num_x_(10),     // motion resolution in x
     num_y_(10),     // motion resolution in y
-    num_angle_(30)  // motion resolution in angle
+    num_angle_(30),  // motion resolution in angle
+
 
     max_particle_cost_(0);
 
     observation_weight_(3);
     motion_model_weight_(1);
+
+    // tunable parameters: ObserveOdometry
+    min_dist_between_CSM_(0.5),  // meters
+    min_angle_between_CSM_(30*M_PI/180) // radians (30 deg)
+
     {}
 
 void SLAM::GetPose(Eigen::Vector2f* loc, float* angle) const {
@@ -189,7 +195,7 @@ void SLAM::ObserveOdometry(const Vector2f& odom_loc, const float odom_angle) {
   float dist = distance.norm();
 
   if(dist > min_dist_between_CSM_ or abs(delta_angle) > min_angle_between_CSM_){
-    MotionModel(mle_pose_.loc, mle_pose_.angle, distance, delta_angle);
+    MotionModel(mle_pose_.loc, mle_pose_.angle, dist, delta_angle);
     prev_odom_angle_ = odom_angle;
     prev_odom_loc_ = odom_loc;
   }

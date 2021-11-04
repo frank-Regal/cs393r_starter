@@ -24,6 +24,7 @@
 
 #include "eigen3/Eigen/Dense"
 #include "eigen3/Eigen/Geometry"
+#include "shared/util/random.h"
 
 #ifndef SRC_SLAM_H_
 #define SRC_SLAM_H_
@@ -95,8 +96,6 @@ class SLAM {
   // Transform Point Cloud to Baselink
   void transform_to_robot_baselink(Observation &point_cloud);
 
-  
-
  private:
 
   // Previous odometry-reported locations.
@@ -104,14 +103,17 @@ class SLAM {
   float prev_odom_angle_;
   bool odom_initialized_;
 
-  // tunable parameters:
-  float a1_;
-  float a2_;
-  float a3_;
-  float a4_;
+  // Random number generator.
+  util_random::Random rng_;
 
-  float min_dist_between_CSM_;
-  float min_angle_between_CSM_;
+  // tunable parameters: CSM
+  float max_particle_cost_;
+
+  // tunable parameters: MotionModel
+  float a1_; 
+  float a2_; 
+  float a3_;;
+  float a4_;
 
   float num_x_;
   float num_y_;
@@ -122,6 +124,9 @@ class SLAM {
   float observation_weight_;
   float motion_model_weight_;
 
+  // tunable parameters: ObserveOdometry
+  float min_dist_between_CSM_;
+  float min_angle_between_CSM_;
 };
 }  // namespace slam
 
