@@ -155,7 +155,7 @@ void SLAM::CorrelativeScanMatching(Observation &new_laser_scan)
     for (const auto &cur_points : new_point_cloud)
     {
       new_point_cloud_last_pose = TF_cloud_to_last_pose(cur_points);
-      observation_cost += log_likelihood;
+      observation_cost += log_likelihood; // TODO
     }
 
     float norm_observation_cost = observation_cost/size_of_point_cloud;
