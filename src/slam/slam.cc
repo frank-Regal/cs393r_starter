@@ -78,10 +78,10 @@ SLAM::SLAM() :
 
     // tunable parameters: ObserveOdometry
     min_dist_between_CSM_(0.5),  // meters
-    min_angle_between_CSM_(30*M_PI/180) // radians (30 deg)
+    min_angle_between_CSM_(30*M_PI/180), // radians (30 deg)
 
     // used for parsing point cloud
-    num_ranges_to_skip_(10);
+    num_ranges_to_skip_(10)
 
     {}
 
