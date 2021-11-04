@@ -106,7 +106,9 @@ void SLAM::ObserveLaser(const vector<float>& ranges,
 // Parse the laser scan to a smaller number of ranges
 void SLAM::parse_laser_scan(Observation &laser_scan)
 {
-  for (int i {0}; i < laser_scan.ranges.size(); i++)
+  int laser_scan_size = laser_scan.ranges.size();
+
+  for(int i = 0; i < laser_scan_size; i++)
   {
     if ((i % num_ranges_to_skip_) != 0)
     {
@@ -140,8 +142,9 @@ std::vector<Eigen::Vector2f> SLAM::to_point_cloud(const Observation &laser_scan)
 void SLAM::TF_to_robot_baselink(Observation &laser_scan)
 {
   float delta_angle = (laser_scan.angle_max - laser_scan.angle_min) / laser_scan.ranges.size();
+  int laser_scan_size = laser_scan.ranges.size();
 
-  for(int i = 0; i < laser_scan.ranges.size(); i++){
+  for(int i = 0; i < laser_scan_size; i++){
     float x = laser_scan.ranges[i]*cos(delta_angle*i)+0.2;
     float y = laser_scan.ranges[i]*sin(delta_angle*i);
     laser_scan.ranges[i] = sqrt(pow(x,2) + pow(y,2));
@@ -187,7 +190,7 @@ void SLAM::CorrelativeScanMatching(Observation &new_laser_scan)
     for (const auto &cur_points : new_point_cloud)
     {
       Vector2f new_point_cloud_last_pose = TF_cloud_to_last_pose(cur_points, particle);
-      observation_cost += log_likelihood; // TODO
+      observation_cost = new_point_cloud_last_pose.x(); // TODO
     }
 
     float norm_observation_cost = observation_cost/size_of_point_cloud;
@@ -259,7 +262,7 @@ void SLAM::ObserveOdometry(const Vector2f& odom_loc, const float odom_angle) {
   // poses.
 }
 
-vector<Vector2f> SLAM::GetMap() {
+std::vector<Eigen::Vector2f> SLAM::GetMap() {
   vector<Vector2f> map;
   // Reconstruct the map as a single aligned point cloud from all saved poses
   // and their respective scans.
