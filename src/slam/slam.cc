@@ -187,7 +187,7 @@ void SLAM::CorrelativeScanMatching(Observation &new_laser_scan)
     for (const auto &cur_points : new_point_cloud)
     {
       Vector2f new_point_cloud_last_pose = TF_cloud_to_last_pose(cur_points, particle);
-      observation_cost += log_likelihood; // TODO
+      //observation_cost += log_likelihood; // TODO
     }
 
     float norm_observation_cost = observation_cost/size_of_point_cloud;
