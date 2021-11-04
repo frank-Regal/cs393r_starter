@@ -91,7 +91,7 @@ class SLAM {
   void parse_laser_scan(Observation &laser_scan);
 
   // Convert Laser Scan to Point Cloud
-  std::vector<Eigen::Vector2f> to_point_cloud(Observation &laser_scan);
+  std::vector<Eigen::Vector2f> to_point_cloud(const Observation &laser_scan);
 
   // Transform Point Cloud to Baselink
   void TF_to_robot_baselink(Observation &laser_scan);
@@ -127,6 +127,8 @@ class SLAM {
   // tunable parameters: ObserveOdometry
   float min_dist_between_CSM_;
   float min_angle_between_CSM_;
+
+  int num_ranges_to_skip_;
 };
 }  // namespace slam
 

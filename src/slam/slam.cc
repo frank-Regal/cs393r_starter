@@ -80,6 +80,9 @@ SLAM::SLAM() :
     min_dist_between_CSM_(0.5),  // meters
     min_angle_between_CSM_(30*M_PI/180) // radians (30 deg)
 
+    // used for parsing point cloud
+    num_ranges_to_skip_(10);
+
     {}
 
 void SLAM::GetPose(Eigen::Vector2f* loc, float* angle) const {
@@ -103,13 +106,34 @@ void SLAM::ObserveLaser(const vector<float>& ranges,
 // Parse the laser scan to a smaller number of ranges
 void SLAM::parse_laser_scan(Observation &laser_scan)
 {
-  // TODO
+  for (int i {0}; i < laser_scan.ranges.size(); i++)
+  {
+    if ((i % num_ranges_to_skip_) != 0)
+    {
+      laser_scan.ranges.erase(laser_scan.ranges.begin()+i);
+    }
+  }
 }
 
 // Convert Laser Scan to Point Cloud
-std::vector<Eigen::Vector2f> SLAM::to_point_cloud(Observation &laser_scan)
+std::vector<Eigen::Vector2f> SLAM::to_point_cloud(const Observation &laser_scan)
 {
-  // TODO
+  int num_ranges = laser_scan.ranges.size();
+
+  Eigen::Vector2f point(0,0);
+  std::vector<Eigen::Vector2f> point_cloud_out;
+  float angle_spacing = (laser_scan.angle_max - laser_scan.angle_min) / num_ranges;
+  float angle = laser_scan.angle_min;
+
+  for (int i {0}; i < num_ranges; i++)
+  {
+    point.x() = laser_scan.ranges[i] * cos(angle);
+    point.y() = laser_scan.ranges[i] * sin(angle);
+    point_cloud_out.push_back(point);
+    angle += angle_spacing;
+  }
+
+  return point_cloud_out;
 }
 
 // Transform Point Cloud to Baselink
