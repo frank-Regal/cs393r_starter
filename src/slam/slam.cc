@@ -63,6 +63,8 @@ SLAM::SLAM() :
     
     // tunable parameters: CSM
     max_particle_cost_(0),
+    observation_weight_(3),
+    motion_model_weight_(1),
 
     // tunable parameters: MotionModel
     a1_(0.2), // trans 
@@ -73,11 +75,6 @@ SLAM::SLAM() :
     num_x_(10),     // motion resolution in x
     num_y_(10),     // motion resolution in y
     num_angle_(30),  // motion resolution in angle
-
-    max_particle_cost_(0);
-
-    observation_weight_(3);
-    motion_model_weight_(1);
 
     // tunable parameters: ObserveOdometry
     min_dist_between_CSM_(0.5),  // meters
@@ -104,19 +101,19 @@ void SLAM::ObserveLaser(const vector<float>& ranges,
 }
 
 // Parse the laser scan to a smaller number of ranges
-void parse_laser_scan(Observation &laser_scan)
+void SLAM::parse_laser_scan(Observation &laser_scan)
 {
   // TODO
 }
 
 // Convert Laser Scan to Point Cloud
-std::vector<Eigen::Vector2f> to_point_cloud(Observation &laser_scan)
+std::vector<Eigen::Vector2f> SLAM::to_point_cloud(Observation &laser_scan)
 {
   // TODO
 }
 
 // Transform Point Cloud to Baselink
-void TF_to_robot_baselink(Observation &point_cloud)
+void SLAM::TF_to_robot_baselink(Observation &point_cloud)
 {
   // TODO
 }
@@ -139,7 +136,7 @@ void SLAM::CorrelativeScanMatching(Observation &new_laser_scan)
   std::vector<Eigen::Vector2f> new_point_cloud = to_point_cloud(new_laser_scan);
 
   // *TODO* Transfer new_laser_scan to Baselink of Robot
-  TF_robot_baselink(new_point_cloud);
+  TF_to_robot_baselink(new_point_cloud);
 
   // Grab size of point cloud for normalizations
   int size_of_point_cloud = new_point_cloud.size();

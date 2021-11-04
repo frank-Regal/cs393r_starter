@@ -111,6 +111,8 @@ class SLAM {
 
   // tunable parameters: CSM
   float max_particle_cost_;
+  float observation_weight_;
+  float motion_model_weight_;
 
   // tunable parameters: MotionModel
   float a1_; 
@@ -121,11 +123,6 @@ class SLAM {
   float num_x_;
   float num_y_;
   float num_angle_;
-
-  // Cost Parameters
-  float max_particle_cost_;
-  float observation_weight_;
-  float motion_model_weight_;
 
   // tunable parameters: ObserveOdometry
   float min_dist_between_CSM_;
