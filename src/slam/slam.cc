@@ -74,7 +74,6 @@ SLAM::SLAM() :
     num_y_(10),     // motion resolution in y
     num_angle_(30),  // motion resolution in angle
 
-
     max_particle_cost_(0);
 
     observation_weight_(3);
@@ -104,8 +103,33 @@ void SLAM::ObserveLaser(const vector<float>& ranges,
 
 }
 
+// Parse the laser scan to a smaller number of ranges
+void parse_laser_scan(Observation &laser_scan)
+{
+  // TODO
+}
+
+// Convert Laser Scan to Point Cloud
+std::vector<Eigen::Vector2f> to_point_cloud(Observation &laser_scan)
+{
+  // TODO
+}
+
+// Transform Point Cloud to Baselink
+void TF_to_robot_baselink(Observation &point_cloud)
+{
+  // TODO
+}
+
+// Transform Point Cloud to Last Pose
+std::vector<Eigen::Vector2f> SLAM::TF_cloud_to_last_pose(const std::vector<Eigen::Vector2f> &point_cloud)
+{
+  // TODO
+}
+
 // Match up Laser Scans and Return the most likely estimated pose (mle_pose_)
-void SLAM::CorrelativeScanMatching(Observation &new_laser_scan) {
+void SLAM::CorrelativeScanMatching(Observation &new_laser_scan) 
+{
   max_particle_cost_ = 0;
 
   // *TODO* parse the incoming laser scan to be more manageable

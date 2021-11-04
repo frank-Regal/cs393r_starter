@@ -91,10 +91,13 @@ class SLAM {
   void parse_laser_scan(Observation &laser_scan);
 
   // Convert Laser Scan to Point Cloud
-  std::vector<Eigen::Vector2f> convert_to_point_cloud(Observation &laser_scan);
+  std::vector<Eigen::Vector2f> to_point_cloud(Observation &laser_scan);
 
   // Transform Point Cloud to Baselink
-  void transform_to_robot_baselink(Observation &point_cloud);
+  void TF_to_robot_baselink(Observation &point_cloud);
+
+  // Transform Point Cloud to Last Pose
+  std::vector<Eigen::Vector2f> TF_cloud_to_last_pose(const std::vector<Eigen::Vector2f> &point_cloud);
 
  private:
 
