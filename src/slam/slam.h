@@ -57,7 +57,7 @@ struct MLE_Pose {
   Eigen::Vector2f loc;
   float angle;
   double weight;
-}
+};
 
 class SLAM {
  public:
@@ -79,7 +79,7 @@ class SLAM {
                        const float odom_angle);
 
   // Get latest map.
-  std::vector<Eigen::Vector2f> GetMap();
+  Eigen::Vector2f GetMap();
 
   // Get latest robot pose.
   void GetPose(Eigen::Vector2f* loc, float* angle) const;
@@ -94,10 +94,10 @@ class SLAM {
   std::vector<Eigen::Vector2f> to_point_cloud(Observation &laser_scan);
 
   // Transform Point Cloud to Baselink
-  void TF_to_robot_baselink(Observation &point_cloud);
+  void TF_to_robot_baselink(Observation &laser_scan);
 
   // Transform Point Cloud to Last Pose
-  std::vector<Eigen::Vector2f> TF_cloud_to_last_pose(const std::vector<Eigen::Vector2f> &point_cloud);
+  Eigen::Vector2f TF_cloud_to_last_pose(const Eigen::Vector2f cur_points, const Particle &particle);
 
  private:
 
