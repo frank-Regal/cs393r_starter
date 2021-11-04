@@ -129,7 +129,9 @@ Eigen::Vector2f SLAM::TF_cloud_to_last_pose(const Eigen::Vector2f cur_points, co
 {
   Vector2f odom_diff = particle.loc - mle_pose_.loc;
   float odom_delta_angle = AngleDiff(particle.angle, mle_pose_.angle);
-  Vector2f new_point_cloud_last_pose;
+  Eigen::Rotation2Df R_mle_change(-mle_pose_.angle);
+  Eigen::Rotation2Df R_odom_change(odom_delta_angle);
+  Vector2f new_point_cloud_last_pose = R_mle_change*odom_diff + R_odom_change*cur_points;
   return new_point_cloud_last_pose;
   }
 
