@@ -36,13 +36,27 @@ struct Particle {
   double weight;
 };
 
+// Struct to Hold Observation from Laser Scan
 struct Observation {
-  std::vector<float>& ranges;
+  std::vector<float> ranges;
   float range_min;
   float range_max;
   float angle_min;
   float angle_max;
 };
+
+// Struct to Save the Most Likely Estimated Pose [p(x(i) | x(i-1), u, m, z)]
+// where:
+// x(i) = most likely estimated pose
+// x(i-1) = previous most likely estimated pose
+// u = odometry readings
+// m = map (in this case we just use the last known laser scan)
+// z = observatioin (laser scan)
+struct MLE_Pose {
+  Eigen::Vector2f loc;
+  float angle;
+  double weight;
+}
 
 class SLAM {
  public:
@@ -69,8 +83,19 @@ class SLAM {
   // Get latest robot pose.
   void GetPose(Eigen::Vector2f* loc, float* angle) const;
 
-  // Succesive Scan Matching Method
-  void SLAM::CorrelativeScanMatching(const Observation &new_laser_scan)
+  // Successive Scan Matching Method (Refrence: Olson, 2009)
+  void CorrelativeScanMatching(Observation &new_laser_scan);
+
+  // Parse the laser scan to a smaller number of ranges
+  void parse_laser_scan(Observation &laser_scan);
+
+  // Convert Laser Scan to Point Cloud
+  std::vector<Eigen::Vector2f> convert_to_point_cloud(Observation &laser_scan);
+
+  // Transform Point Cloud to Baselink
+  void transform_to_robot_baselink(Observation &point_cloud);
+
+  
 
  private:
 
@@ -91,6 +116,12 @@ class SLAM {
   float num_x_;
   float num_y_;
   float num_angle_;
+
+  // Cost Parameters
+  float max_particle_cost_;
+  float observation_weight_;
+  float motion_model_weight_;
+
 };
 }  // namespace slam
 

@@ -75,6 +75,9 @@ SLAM::SLAM() :
     num_angle_(30)  // motion resolution in angle
 
     max_particle_cost_(0);
+
+    observation_weight_(3);
+    motion_model_weight_(1);
     {}
 
 void SLAM::GetPose(Eigen::Vector2f* loc, float* angle) const {
@@ -103,39 +106,44 @@ void SLAM::CorrelativeScanMatching(Observation &new_laser_scan) {
   parse_laser_scan(new_laser_scan);
 
   // *TODO* convert to a point cloud  
-  std::vector<Eigen::Vector2f> new_point_cloud = convert_to_point_cloud(new_laser_scan);
+  std::vector<Eigen::Vector2f> new_point_cloud = to_point_cloud(new_laser_scan);
 
   // *TODO* Transfer new_laser_scan to Baselink of Robot
-  transform_to_robot_baselink(new_point_cloud);
+  TF_robot_baselink(new_point_cloud);
+
+  // Grab size of point cloud for normalizations
+  int size_of_point_cloud = new_point_cloud.size();
   
   // Loop through all particles_ from motion model to find best pose
   for (const auto &particle:particles_)
   {
     // cost of the laser scan
+    float particle_pose_cost {0};
     float observation_cost {0};
 
     // transform this laser scan's point cloud to last pose's base_link
     for (const auto &cur_points : new_point_cloud)
     {
-      buid_map
+      new_point_cloud_last_pose = TF_cloud_to_last_pose(cur_points);
+      observation_cost += log_likelihood;
     }
 
-
+    float norm_observation_cost = observation_cost/size_of_point_cloud;
+    float norm_motion_model_cost = particle.weight / 3;
+    
+    // Calculate the Overall Likelihood of this pose based on weights from the observation and the motion model;
+    particle_pose_cost = (norm_observation_cost * observation_weight_) +
+                          (norm_motion_model_cost * motion_model_weight_);
+    
+    // If this particle is a very high probability, set it as the best guess
+    if (particle_pose_cost > max_particle_cost_)
+    {
+      mle_pose_.angle  = particle.angle;
+      mle_pose_.loc    = particle.loc;
+      mle_pose_.weight = particle.weight;
+      max_particle_cost_ = particle_pose_cost;
+    }
   }
-
-  
-
-  // Get size of parsed and transformed laser scan
-  int num_ranges = new_laser_scan.ranges->size();
-
-
-
-
-
-
-
-
-
 }
 
 void SLAM::MotionModel(Eigen::Vector2f loc, float angle, float dist, float delta_angle){
