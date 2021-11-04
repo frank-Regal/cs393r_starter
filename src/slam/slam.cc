@@ -137,16 +137,25 @@ std::vector<Eigen::Vector2f> SLAM::to_point_cloud(const Observation &laser_scan)
 }
 
 // Transform Point Cloud to Baselink
-void SLAM::TF_to_robot_baselink(Observation &point_cloud)
+void SLAM::TF_to_robot_baselink(Observation &laser_scan)
 {
-  // TODO
+  float delta_angle = (laser_scan.angle_max - laser_scan.angle_min) / laser_scan.ranges.size();
+
+  for(int i = 0; i < laser_scan.ranges.size(); i++){
+    float x = laser_scan.ranges[i]*cos(delta_angle*i)+0.2;
+    float y = laser_scan.ranges[i]*sin(delta_angle*i);
+    laser_scan.ranges[i] = sqrt(pow(x,2) + pow(y,2));
+  }
 }
 
 // Transform Point Cloud to Last Pose
-std::vector<Eigen::Vector2f> SLAM::TF_cloud_to_last_pose(const std::vector<Eigen::Vector2f> &point_cloud)
+Eigen::Vector2f SLAM::TF_cloud_to_last_pose(const Eigen::Vector2f cur_points, const Particle &particle)
 {
-  // TODO
-}
+  Vector2f odom_diff = particle.loc - mle_pose_.loc;
+  float odom_delta_angle = AngleDiff(particle.angle, mle_pose_.angle);
+  Vector2f new_point_cloud_last_pose;
+  return new_point_cloud_last_pose;
+  }
 
 // Match up Laser Scans and Return the most likely estimated pose (mle_pose_)
 void SLAM::CorrelativeScanMatching(Observation &new_laser_scan) 
@@ -175,8 +184,8 @@ void SLAM::CorrelativeScanMatching(Observation &new_laser_scan)
     // transform this laser scan's point cloud to last pose's base_link
     for (const auto &cur_points : new_point_cloud)
     {
-      new_point_cloud_last_pose = TF_cloud_to_last_pose(cur_points);
-      //observation_cost += log_likelihood; // TODO
+      Vector2f new_point_cloud_last_pose = TF_cloud_to_last_pose(cur_points, particle);
+      observation_cost += log_likelihood; // TODO
     }
 
     float norm_observation_cost = observation_cost/size_of_point_cloud;
