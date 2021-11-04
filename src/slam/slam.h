@@ -79,7 +79,7 @@ class SLAM {
                        const float odom_angle);
 
   // Get latest map.
-  Eigen::Vector2f GetMap();
+  std::vector<Eigen::Vector2f> GetMap();
 
   // Get latest robot pose.
   void GetPose(Eigen::Vector2f* loc, float* angle) const;
