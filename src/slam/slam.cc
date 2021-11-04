@@ -131,12 +131,12 @@ void SLAM::CorrelativeScanMatching(Observation &new_laser_scan)
 
   // *TODO* parse the incoming laser scan to be more manageable
   parse_laser_scan(new_laser_scan);
+  
+  // *TODO* Transfer new_laser_scan to Baselink of Robot
+  TF_to_robot_baselink(new_laser_scan);
 
   // *TODO* convert to a point cloud  
   std::vector<Eigen::Vector2f> new_point_cloud = to_point_cloud(new_laser_scan);
-
-  // *TODO* Transfer new_laser_scan to Baselink of Robot
-  TF_to_robot_baselink(new_point_cloud);
 
   // Grab size of point cloud for normalizations
   int size_of_point_cloud = new_point_cloud.size();
