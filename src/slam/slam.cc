@@ -191,8 +191,10 @@ void SLAM::CorrelativeScanMatching(Observation &new_laser_scan)
     float particle_pose_cost {0};
     float observation_cost {0};
 
+    int point_cloud_size = new_point_cloud.size();
+
     // transform this laser scan's point cloud to last pose's base_link
-    for (int i {0}; i < new_point_cloud.size(); i++)
+    for (int i {0}; i < point_cloud_size; i++)
     {
       Vector2f new_point_cloud_last_pose = TF_cloud_to_last_pose(new_point_cloud[i], particle);
       float x_dist = new_point_cloud_last_pose.x() - last_point_cloud_[i].x();
@@ -266,7 +268,7 @@ void SLAM::ObserveOdometry(const Vector2f& odom_loc, const float odom_angle) {
   float dist = distance.norm();
 
   // Calculate the rotation matrix from odom to the most likely estimated pose
-  Eigen::Rotation2Df R_odom_to_mle = Eigen::Rotation2D(mle_pose_.angle - prev_odom_angle_);
+  Eigen::Rotation2Df R_odom_to_mle = Eigen::Rotation2Df(mle_pose_.angle - prev_odom_angle_);
 
   // Update the pose called in GetPose() to return to the simulator
   give_pose_.loc = mle_pose_.loc + R_odom_to_mle*distance;
