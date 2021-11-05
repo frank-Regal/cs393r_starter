@@ -193,8 +193,8 @@ void SLAM::CorrelativeScanMatching(Observation &new_laser_scan)
     for (int i {0}; i < new_point_cloud.size(); i++)
     {
       Vector2f new_point_cloud_last_pose = TF_cloud_to_last_pose(new_point_cloud[i], particle);
-      float x_dist = new_point_cloud_last_pose.x() - last_point_cloud[i].x();
-      float y_dist = new_point_cloud_last_pose.y() - last_point_cloud[i].y();
+      float x_dist = new_point_cloud_last_pose.x() - last_point_cloud_[i].x();
+      float y_dist = new_point_cloud_last_pose.y() - last_point_cloud_[i].y();
       float dist = pow(x_dist,2) + pow(y_dist,2);
       observation_cost += exp(-(pow(dist,2) / pow(ray_std_dev_,2)));
     }
@@ -273,6 +273,9 @@ void SLAM::ObserveOdometry(const Vector2f& odom_loc, const float odom_angle) {
 
 std::vector<Eigen::Vector2f> SLAM::GetMap() {
   vector<Vector2f> map;
+  for(auto point : last_point_cloud_){
+    map.push_back(point);
+  }
   // Reconstruct the map as a single aligned point cloud from all saved poses
   // and their respective scans.
   return map;
