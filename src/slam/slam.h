@@ -88,7 +88,7 @@ class SLAM {
   void CorrelativeScanMatching(Observation &new_laser_scan);
 
   // Parse the laser scan to a smaller number of ranges
-  void parse_laser_scan(Observation &laser_scan);
+  Observation parse_laser_scan(const Observation &laser_scan);
 
   // Convert Laser Scan to Point Cloud
   std::vector<Eigen::Vector2f> to_point_cloud(const Observation &laser_scan);

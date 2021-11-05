@@ -112,17 +112,24 @@ void SLAM::ObserveLaser(const vector<float>& ranges,
 }
 
 // Parse the laser scan to a smaller number of ranges
-void SLAM::parse_laser_scan(Observation &laser_scan)
-{
+Observation SLAM::parse_laser_scan(const Observation &laser_scan)
+{ 
   int laser_scan_size = laser_scan.ranges.size();
-
+  Observation parsed_laser_scan;
+  parsed_laser_scan.range_min = laser_scan.range_min;
+  parsed_laser_scan.range_max = laser_scan.range_max;
+  parsed_laser_scan.angle_min = laser_scan.angle_min;
+  parsed_laser_scan.angle_max = laser_scan.angle_max;
+  
   for(int i = 0; i < laser_scan_size; i++)
   {
-    if ((i % num_ranges_to_skip_) != 0)
+    if ((i % num_ranges_to_skip_) == 0)
     {
-      laser_scan.ranges.erase(laser_scan.ranges.begin()+i);
+      parsed_laser_scan.ranges.push_back(laser_scan.ranges[i]);
     }
   }
+  
+  return parsed_laser_scan;
 }
 
 // Convert Laser Scan to Point Cloud
@@ -148,7 +155,7 @@ std::vector<Eigen::Vector2f> SLAM::to_point_cloud(const Observation &laser_scan)
 
 // Transform Point Cloud to Baselink
 void SLAM::TF_to_robot_baselink(Observation &laser_scan)
-{
+{ 
   float delta_angle = (laser_scan.angle_max - laser_scan.angle_min) / laser_scan.ranges.size();
   int laser_scan_size = laser_scan.ranges.size();
 
@@ -157,6 +164,7 @@ void SLAM::TF_to_robot_baselink(Observation &laser_scan)
     float y = laser_scan.ranges[i]*sin(delta_angle*i);
     laser_scan.ranges[i] = sqrt(pow(x,2) + pow(y,2));
   }
+  
 }
 
 // Transform Point Cloud to Last Pose
@@ -168,6 +176,7 @@ Eigen::Vector2f SLAM::TF_cloud_to_last_pose(const Eigen::Vector2f cur_points, co
   Eigen::Rotation2Df R_odom_change(odom_delta_angle);
   Vector2f new_point_cloud_last_pose = R_mle_change*odom_diff + R_odom_change*cur_points;
   return new_point_cloud_last_pose;
+  
   }
 
 // Match up Laser Scans and Return the most likely estimated pose (mle_pose_)
@@ -176,14 +185,14 @@ void SLAM::CorrelativeScanMatching(Observation &new_laser_scan)
   max_particle_cost_ = 0;
 
   // parse the incoming laser scan to be more manageable
-  parse_laser_scan(new_laser_scan);
+  Observation parsed_laser_scan = parse_laser_scan(new_laser_scan);
   
   // Transfer new_laser_scan to Baselink of Robot
-  TF_to_robot_baselink(new_laser_scan);
+  TF_to_robot_baselink(parsed_laser_scan);
 
   // convert to a point cloud  
-  std::vector<Eigen::Vector2f> new_point_cloud = to_point_cloud(new_laser_scan);
-
+  std::vector<Eigen::Vector2f> new_point_cloud = to_point_cloud(parsed_laser_scan);
+  
   int point_cloud_size = new_point_cloud.size();
   
   // Loop through all particles_ from motion model to find best pose
@@ -219,8 +228,9 @@ void SLAM::CorrelativeScanMatching(Observation &new_laser_scan)
 
   last_point_cloud_.clear();
   last_point_cloud_ = new_point_cloud;
-
+  
 }
+
 
 void SLAM::MotionModel(Eigen::Vector2f loc, float angle, float dist, float delta_angle){
   particles_.clear();
@@ -251,6 +261,7 @@ void SLAM::MotionModel(Eigen::Vector2f loc, float angle, float dist, float delta
     }
   }
 }
+
 
 void SLAM::ObserveOdometry(const Vector2f& odom_loc, const float odom_angle) {
   if (!odom_initialized_){
