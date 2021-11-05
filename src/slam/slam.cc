@@ -183,6 +183,8 @@ void SLAM::CorrelativeScanMatching(Observation &new_laser_scan)
 
   // convert to a point cloud  
   std::vector<Eigen::Vector2f> new_point_cloud = to_point_cloud(new_laser_scan);
+
+  int point_cloud_size = new_point_cloud.size();
   
   // Loop through all particles_ from motion model to find best pose
   for (const auto &particle:particles_)
@@ -190,8 +192,6 @@ void SLAM::CorrelativeScanMatching(Observation &new_laser_scan)
     // cost of the laser scan
     float particle_pose_cost {0};
     float observation_cost {0};
-
-    int point_cloud_size = new_point_cloud.size();
 
     // transform this laser scan's point cloud to last pose's base_link
     for (int i {0}; i < point_cloud_size; i++)
