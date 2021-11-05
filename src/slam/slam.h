@@ -133,7 +133,9 @@ class SLAM {
 
   int num_ranges_to_skip_;
 
-  std::vector<Eigen::Vector2f> last_point_cloud;
+  std::vector<Eigen::Vector2f> last_point_cloud_;
+  
+
 };
 }  // namespace slam
 

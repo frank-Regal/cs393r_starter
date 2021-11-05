@@ -54,8 +54,10 @@ vector<Particle> particles_;
 
 // Most Likely Estimated pose
 Particle mle_pose_;
+Particle give_pose_;
 
 Observation new_scan_;
+
 
 SLAM::SLAM() :
     prev_odom_loc_(0, 0),
@@ -88,8 +90,8 @@ SLAM::SLAM() :
 
 void SLAM::GetPose(Eigen::Vector2f* loc, float* angle) const {
   // Return the latest pose estimate of the robot.
-  *loc = Vector2f(0, 0);
-  *angle = 0;
+  *loc = give_pose_.loc;
+  *angle = give_pose_.angle;
 }
 
 void SLAM::ObserveLaser(const vector<float>& ranges,
@@ -249,18 +251,27 @@ void SLAM::MotionModel(Eigen::Vector2f loc, float angle, float dist, float delta
 }
 
 void SLAM::ObserveOdometry(const Vector2f& odom_loc, const float odom_angle) {
-  if (!odom_initialized_) {
+  if (!odom_initialized_){
     prev_odom_angle_ = odom_angle;
     prev_odom_loc_ = odom_loc;
     odom_initialized_ = true;
     return;
-  
-
   }
 
+  // Calculate odom deltas for location and angle
   Vector2f distance = odom_loc - prev_odom_loc_;
   float delta_angle = AngleDiff(odom_angle, prev_odom_angle_);
+
+  // Calculate the magnitude of the distance traveled
   float dist = distance.norm();
+
+  // Calculate the rotation matrix from odom to the most likely estimated pose
+  Eigen::Rotation2Df R_odom_to_mle = Eigen::Rotation2D(mle_pose_.angle - prev_odom_angle_);
+
+  // Update the pose called in GetPose() to return to the simulator
+  give_pose_.loc = mle_pose_.loc + R_odom_to_mle*distance;
+  give_pose_.angle = ((mle_pose_.angle + delta_angle + M_PI)/(2*M_PI)) - M_PI;
+
 
   if(dist > min_dist_between_CSM_ or abs(delta_angle) > min_angle_between_CSM_){
     MotionModel(mle_pose_.loc, mle_pose_.angle, dist, delta_angle);
@@ -275,6 +286,11 @@ std::vector<Eigen::Vector2f> SLAM::GetMap() {
   vector<Vector2f> map;
   // Reconstruct the map as a single aligned point cloud from all saved poses
   // and their respective scans.
+  for (auto point : last_point_cloud_)
+  {
+    map.push_back(point);
+  }
+
   return map;
 }
 
