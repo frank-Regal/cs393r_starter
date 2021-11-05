@@ -114,6 +114,9 @@ class SLAM {
   float observation_weight_;
   float motion_model_weight_;
 
+  // Standard deviation of Physical LIDAR System; set_parameter
+  double ray_std_dev_;
+
   // tunable parameters: MotionModel
   float a1_; 
   float a2_; 
@@ -129,6 +132,8 @@ class SLAM {
   float min_angle_between_CSM_;
 
   int num_ranges_to_skip_;
+
+  std::vector<Eigen::Vector2f> last_point_cloud;
 };
 }  // namespace slam
 

@@ -55,16 +55,18 @@ vector<Particle> particles_;
 // Most Likely Estimated pose
 Particle mle_pose_;
 
+Observation new_scan_;
 
 SLAM::SLAM() :
     prev_odom_loc_(0, 0),
     prev_odom_angle_(0),
     odom_initialized_(false), 
-    
+
     // tunable parameters: CSM
     max_particle_cost_(0),
-    observation_weight_(3),
+    observation_weight_(1),
     motion_model_weight_(1),
+    ray_std_dev_(0.15),
 
     // tunable parameters: MotionModel
     a1_(0.2), // trans 
@@ -82,7 +84,6 @@ SLAM::SLAM() :
 
     // used for parsing point cloud
     num_ranges_to_skip_(10)
-
     {}
 
 void SLAM::GetPose(Eigen::Vector2f* loc, float* angle) const {
@@ -99,8 +100,13 @@ void SLAM::ObserveLaser(const vector<float>& ranges,
   // A new laser scan has been observed. Decide whether to add it as a pose
   // for SLAM. If decided to add, align it to the scan from the last saved pose,
   // and save both the scan and the optimized pose.
+  new_scan_.ranges    = ranges;
+  new_scan_.range_min = range_min;
+  new_scan_.range_max = range_max;
+  new_scan_.angle_min = angle_min;
+  new_scan_.angle_max = angle_max;
 
-
+  CorrelativeScanMatching(new_scan_);
 }
 
 // Parse the laser scan to a smaller number of ranges
@@ -167,17 +173,14 @@ void SLAM::CorrelativeScanMatching(Observation &new_laser_scan)
 {
   max_particle_cost_ = 0;
 
-  // *TODO* parse the incoming laser scan to be more manageable
+  // parse the incoming laser scan to be more manageable
   parse_laser_scan(new_laser_scan);
   
-  // *TODO* Transfer new_laser_scan to Baselink of Robot
+  // Transfer new_laser_scan to Baselink of Robot
   TF_to_robot_baselink(new_laser_scan);
 
-  // *TODO* convert to a point cloud  
+  // convert to a point cloud  
   std::vector<Eigen::Vector2f> new_point_cloud = to_point_cloud(new_laser_scan);
-
-  // Grab size of point cloud for normalizations
-  int size_of_point_cloud = new_point_cloud.size();
   
   // Loop through all particles_ from motion model to find best pose
   for (const auto &particle:particles_)
@@ -187,19 +190,18 @@ void SLAM::CorrelativeScanMatching(Observation &new_laser_scan)
     float observation_cost {0};
 
     // transform this laser scan's point cloud to last pose's base_link
-    for (const auto &cur_points : new_point_cloud)
+    for (int i {0}; i < new_point_cloud.size(); i++)
     {
-      Vector2f new_point_cloud_last_pose = TF_cloud_to_last_pose(cur_points, particle);
-      observation_cost = new_point_cloud_last_pose.x(); // TODO
-
+      Vector2f new_point_cloud_last_pose = TF_cloud_to_last_pose(new_point_cloud[i], particle);
+      float x_dist = new_point_cloud_last_pose.x() - last_point_cloud[i].x();
+      float y_dist = new_point_cloud_last_pose.y() - last_point_cloud[i].y();
+      float dist = pow(x_dist,2) + pow(y_dist,2);
+      observation_cost += exp(-(pow(dist,2) / pow(ray_std_dev_,2)));
     }
-
-    float norm_observation_cost = observation_cost/size_of_point_cloud;
-    float norm_motion_model_cost = particle.weight / 3;
     
     // Calculate the Overall Likelihood of this pose based on weights from the observation and the motion model;
-    particle_pose_cost = (norm_observation_cost * observation_weight_) +
-                          (norm_motion_model_cost * motion_model_weight_);
+    particle_pose_cost = (observation_cost * observation_weight_) +
+                          (particle.weight * motion_model_weight_);
     
     // If this particle is a very high probability, set it as the best guess
     if (particle_pose_cost > max_particle_cost_)
@@ -210,6 +212,10 @@ void SLAM::CorrelativeScanMatching(Observation &new_laser_scan)
       max_particle_cost_ = particle_pose_cost;
     }
   }
+
+  last_point_cloud_.clear();
+  last_point_cloud_ = new_point_cloud;
+
 }
 
 void SLAM::MotionModel(Eigen::Vector2f loc, float angle, float dist, float delta_angle){
@@ -248,6 +254,8 @@ void SLAM::ObserveOdometry(const Vector2f& odom_loc, const float odom_angle) {
     prev_odom_loc_ = odom_loc;
     odom_initialized_ = true;
     return;
+  
+
   }
 
   Vector2f distance = odom_loc - prev_odom_loc_;
