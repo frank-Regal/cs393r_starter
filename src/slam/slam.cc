@@ -101,8 +101,11 @@ std::vector<Eigen::Vector2f> SLAM::GetMap() {
   // Reconstruct the map as a single aligned point cloud from all saved poses
   // and their respective scans.
   for (auto point : last_point_cloud_)
-    map.push_back(point);
-
+  {
+    float x = mle_pose_.loc.x() + point.x();
+    float y = mle_pose_.loc.y() + point.y();
+    map.push_back(Vector2f(x,y));
+  }
   last_point_cloud_.clear();
   return map;
 }
@@ -180,20 +183,22 @@ void SLAM::ObserveLaser(const vector<float>& ranges,
   // for SLAM. If decided to add, align it to the scan from the last saved pose,
   // and save both the scan and the optimized pose.
   
-  if (first_scan_ == true)
+  if (first_scan_ == true and odom_initialized_ == true)
   {
     initial_scan_.ranges    = ranges;
     initial_scan_.range_min = range_min;
     initial_scan_.range_max = range_max;
     initial_scan_.angle_min = angle_min;
     initial_scan_.angle_max = angle_max;
+
+    TF_to_robot_baselink(initial_scan_);
     last_point_cloud_ = to_point_cloud(initial_scan_);
     first_scan_ = false;
   }
 
-  return;
+  //return;
 
-  if (update_scan_==true and odom_initialized_==true)
+  if (update_scan_ == true and odom_initialized_ == true)
   {
     new_scan_.ranges    = ranges;
     new_scan_.range_min = range_min;
@@ -202,7 +207,6 @@ void SLAM::ObserveLaser(const vector<float>& ranges,
     new_scan_.angle_max = angle_max;
 
     mle_pose_ = CorrelativeScanMatching(new_scan_);
-    std::cout << "MLE_pose: " << mle_pose_.loc.x() << std::endl;
     update_scan_ = false;
   }
 }
@@ -321,8 +325,14 @@ Particle SLAM::CorrelativeScanMatching(Observation &new_laser_scan)
       max_particle_cost_ = particle_pose_cost;
     }
   }
+  /*
+  for (auto point_cloud : new_point_cloud)
+  {
 
+  }
+  */
   last_point_cloud_ = new_point_cloud;
+
   return mle_pose_;
 }
 
