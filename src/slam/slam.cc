@@ -296,17 +296,15 @@ void SLAM::ObserveOdometry(const Vector2f& odom_loc, const float odom_angle) {
 }
 
 std::vector<Eigen::Vector2f> SLAM::GetMap() {
-  vector<Vector2f> map;
-  for(auto point : last_point_cloud_){
-    map.push_back(point);
-  }
   // Reconstruct the map as a single aligned point cloud from all saved poses
   // and their respective scans.
   for (auto point : last_point_cloud_)
   {
+    std::cout << point << std::endl;
     map.push_back(point);
   }
-
+  for(auto m : map)
+      std::cout << "map point: " << m << std::endl; 
   return map;
 }
 
