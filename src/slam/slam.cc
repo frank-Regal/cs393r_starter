@@ -57,6 +57,7 @@ Particle mle_pose_;
 Particle give_pose_;
 
 Observation new_scan_;
+Observation initial_scan_;
 
 
 SLAM::SLAM() :
@@ -86,7 +87,8 @@ SLAM::SLAM() :
 
     // used for parsing point cloud
     num_ranges_to_skip_(10),
-    update_scan_(false)
+    update_scan_(false),
+    first_scan_(false)
     {}
 
 void SLAM::GetPose(Eigen::Vector2f* loc, float* angle) const {
@@ -99,12 +101,9 @@ std::vector<Eigen::Vector2f> SLAM::GetMap() {
   // Reconstruct the map as a single aligned point cloud from all saved poses
   // and their respective scans.
   for (auto point : last_point_cloud_)
-  {
-    std::cout << point << std::endl;
     map.push_back(point);
-  }
-  for(auto m : map)
-      std::cout << "map point: " << m << std::endl; 
+
+  last_point_cloud_.clear();
   return map;
 }
 
@@ -112,9 +111,10 @@ void SLAM::ObserveOdometry(const Vector2f& odom_loc, const float odom_angle) {
   if (!odom_initialized_){
     prev_odom_angle_ = odom_angle;
     prev_odom_loc_ = odom_loc;
+    mle_pose_ = Particle({Vector2f(0,0),0,0});
     odom_initialized_ = true;
     update_scan_ = false;
-    mle_pose_ = Particle({Vector2f(0,0),0,0});
+    first_scan_ = true;
     return;
   }
 
@@ -180,6 +180,19 @@ void SLAM::ObserveLaser(const vector<float>& ranges,
   // for SLAM. If decided to add, align it to the scan from the last saved pose,
   // and save both the scan and the optimized pose.
   
+  if (first_scan_ == true)
+  {
+    initial_scan_.ranges    = ranges;
+    initial_scan_.range_min = range_min;
+    initial_scan_.range_max = range_max;
+    initial_scan_.angle_min = angle_min;
+    initial_scan_.angle_max = angle_max;
+    last_point_cloud_ = to_point_cloud(initial_scan_);
+    first_scan_ = false;
+  }
+
+  return;
+
   if (update_scan_==true and odom_initialized_==true)
   {
     new_scan_.ranges    = ranges;
@@ -196,7 +209,7 @@ void SLAM::ObserveLaser(const vector<float>& ranges,
 
 Observation SLAM::parse_laser_scan(const Observation &laser_scan)
 { // Parse the laser scan to a smaller number of ranges
-  return laser_scan;
+  //return laser_scan;
   int laser_scan_size = laser_scan.ranges.size();
   Observation parsed_laser_scan;
   parsed_laser_scan.range_min = laser_scan.range_min;
@@ -217,7 +230,7 @@ Observation SLAM::parse_laser_scan(const Observation &laser_scan)
 
 std::vector<Eigen::Vector2f> SLAM::to_point_cloud(const Observation &laser_scan)
 { // Convert Laser Scan to Point Cloud
-  return std::vector<Eigen::Vector2f> {Vector2f(0,0)};
+  //return std::vector<Eigen::Vector2f> {Vector2f(0,0)};
   int num_ranges = laser_scan.ranges.size();
 
   Eigen::Vector2f point(0,0);
@@ -238,7 +251,7 @@ std::vector<Eigen::Vector2f> SLAM::to_point_cloud(const Observation &laser_scan)
 
 void SLAM::TF_to_robot_baselink(Observation &laser_scan)
 { // Transform Point Cloud to Baselink
-  return;
+  //return;
   float delta_angle = (laser_scan.angle_max - laser_scan.angle_min) / laser_scan.ranges.size();
   int laser_scan_size = laser_scan.ranges.size();
 
@@ -252,7 +265,7 @@ void SLAM::TF_to_robot_baselink(Observation &laser_scan)
 
 Eigen::Vector2f SLAM::TF_cloud_to_last_pose(const Eigen::Vector2f cur_points, const Particle &particle)
 { // Transform Point Cloud to Last Pose
-  return Vector2f(0,0);
+  //return Vector2f(0,0);
   Vector2f odom_diff = particle.loc - mle_pose_.loc;
   float odom_delta_angle = AngleDiff(particle.angle, mle_pose_.angle);
   Eigen::Rotation2Df R_mle_change(-mle_pose_.angle);
@@ -264,7 +277,7 @@ Eigen::Vector2f SLAM::TF_cloud_to_last_pose(const Eigen::Vector2f cur_points, co
 
 Particle SLAM::CorrelativeScanMatching(Observation &new_laser_scan) 
 { // Match up Laser Scans and Return the most likely estimated pose (mle_pose_)
-  return mle_pose_;
+  //return mle_pose_;
   max_particle_cost_ = 0;
 
   // parse the incoming laser scan to be more manageable

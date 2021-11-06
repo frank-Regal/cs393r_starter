@@ -121,8 +121,10 @@ class SLAM {
   int num_ranges_to_skip_;
 
   std::vector<Eigen::Vector2f> last_point_cloud_;
+  std::vector<Eigen::Vector2f> initial_point_cloud_;
 
   bool update_scan_;
+  bool first_scan_;
 
   Eigen::Rotation2Df R_odom_to_mle;
 
