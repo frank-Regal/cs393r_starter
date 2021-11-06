@@ -100,13 +100,6 @@ void SLAM::GetPose(Eigen::Vector2f* loc, float* angle) const {
 std::vector<Eigen::Vector2f> SLAM::GetMap() {
   // Reconstruct the map as a single aligned point cloud from all saved poses
   // and their respective scans.
-  for (auto point : last_point_cloud_)
-  {
-    float x = mle_pose_.loc.x() + point.x();
-    float y = mle_pose_.loc.y() + point.y();
-    map.push_back(Vector2f(x,y));
-  }
-  last_point_cloud_.clear();
   return map;
 }
 
@@ -193,6 +186,9 @@ void SLAM::ObserveLaser(const vector<float>& ranges,
 
     TF_to_robot_baselink(initial_scan_);
     last_point_cloud_ = to_point_cloud(initial_scan_);
+    for (auto point : last_point_cloud_)
+      map.push_back(point);
+
     first_scan_ = false;
   }
 
@@ -207,6 +203,7 @@ void SLAM::ObserveLaser(const vector<float>& ranges,
     new_scan_.angle_max = angle_max;
 
     mle_pose_ = CorrelativeScanMatching(new_scan_);
+    CombineMap(mle_pose_);
     update_scan_ = false;
   }
 }
@@ -334,6 +331,31 @@ Particle SLAM::CorrelativeScanMatching(Observation &new_laser_scan)
   last_point_cloud_ = new_point_cloud;
 
   return mle_pose_;
+}
+
+void SLAM::CombineMap(const Particle pose)
+{
+  int num_ranges = new_scan_.ranges.size();
+  Eigen::Vector2f point(0,0);
+  float angle_spacing = (new_scan_.angle_max - new_scan_.angle_min) / num_ranges;
+  float angle = new_scan_.angle_min;
+
+  for (int i {0}; i < num_ranges; i++)
+  {
+    float x = pose.loc.x() + new_scan_.ranges[i]*cos(pose.angle + (angle_spacing * i) + angle);
+    float y = pose.loc.y() + new_scan_.ranges[i]*sin(pose.angle + (angle_spacing * i) + angle);
+    map.push_back(Vector2f(x,y));
+  }
+
+  /*
+  for (auto point : last_point_cloud_)
+    {
+      float x = mle_pose_.loc.x() + point.x();
+      float y = mle_pose_.loc.y() + point.y();
+      map.push_back(Vector2f(x,y));
+    }
+    last_point_cloud_.clear();
+  */
 }
 
 void SLAM::MotionModel(Eigen::Vector2f loc, float angle, float dist, float delta_angle){

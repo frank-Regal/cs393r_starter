@@ -86,6 +86,9 @@ class SLAM {
   // Transform Point Cloud to Last Pose
   Eigen::Vector2f TF_cloud_to_last_pose(const Eigen::Vector2f cur_points, const Particle &particle);
 
+  // Combine the Map
+  void CombineMap(const Particle pose);
+
  private:
 
   // Previous odometry-reported locations.
