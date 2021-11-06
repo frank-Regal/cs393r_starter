@@ -96,8 +96,6 @@ void SLAM::GetPose(Eigen::Vector2f* loc, float* angle) const {
 }
 
 std::vector<Eigen::Vector2f> SLAM::GetMap() {
-  vector<Vector2f> map;
-
   // Reconstruct the map as a single aligned point cloud from all saved poses
   // and their respective scans.
   for (auto point : last_point_cloud_)
@@ -105,7 +103,8 @@ std::vector<Eigen::Vector2f> SLAM::GetMap() {
     std::cout << point << std::endl;
     map.push_back(point);
   }
-
+  for(auto m : map)
+      std::cout << "map point: " << m << std::endl; 
   return map;
 }
 

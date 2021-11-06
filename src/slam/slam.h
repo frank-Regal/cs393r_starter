@@ -125,6 +125,9 @@ class SLAM {
   bool update_scan_;
 
   Eigen::Rotation2Df R_odom_to_mle;
+
+  std::vector<Eigen::Vector2f> map;
+
 };
 }  // namespace slam
 
