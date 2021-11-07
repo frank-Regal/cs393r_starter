@@ -53,11 +53,10 @@ namespace slam {
 vector<Particle> particles_;
 
 // Most Likely Estimated pose
-Particle mle_pose_;
-Particle give_pose_;
-
-Observation new_scan_;
-Observation initial_scan_;
+Particle mle_pose_;        // best pose updated every laser scan
+Particle give_pose_;       // output pose 
+Observation new_scan_;     // holder for new laser scan observed
+Observation initial_scan_; // initial scan
 
 
 SLAM::SLAM() :
@@ -127,7 +126,6 @@ void SLAM::ObserveOdometry(const Vector2f& odom_loc, const float odom_angle) {
   // Update the pose called in GetPose() to return to the simulator
   give_pose_.loc = mle_pose_.loc + R_odom_to_mle*distance;
   give_pose_.angle = fmod(mle_pose_.angle + delta_angle + M_PI,2*M_PI) - M_PI;
-  
   
   if(dist > min_dist_between_CSM_ or abs(delta_angle) > min_angle_between_CSM_){
     MotionModel(give_pose_.loc, give_pose_.angle, dist, delta_angle);
