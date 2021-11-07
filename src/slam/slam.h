@@ -89,6 +89,8 @@ class SLAM {
   // Combine the Map
   void CombineMap(const Particle pose);
 
+  std::vector<float> TrimRanges(const std::vector<float> &ranges, const float range_min, const float range_max);
+
  private:
 
   // Previous odometry-reported locations.

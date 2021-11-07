@@ -99,6 +99,9 @@ void SLAM::GetPose(Eigen::Vector2f* loc, float* angle) const {
 std::vector<Eigen::Vector2f> SLAM::GetMap() {
   // Reconstruct the map as a single aligned point cloud from all saved poses
   // and their respective scans.
+  if (first_scan_ == true and odom_initialized_ == true)
+    map.clear();
+  
   return map;
 }
 
@@ -176,7 +179,7 @@ void SLAM::ObserveLaser(const vector<float>& ranges,
   
   if (first_scan_ == true and odom_initialized_ == true)
   {
-    initial_scan_.ranges    = ranges;
+    initial_scan_.ranges    = ranges; //TrimRanges(ranges,range_min,range_max);
     initial_scan_.range_min = range_min;
     initial_scan_.range_max = range_max;
     initial_scan_.angle_min = angle_min;
@@ -194,7 +197,7 @@ void SLAM::ObserveLaser(const vector<float>& ranges,
 
   if (update_scan_ == true and odom_initialized_ == true)
   {
-    new_scan_.ranges    = ranges;
+    new_scan_.ranges    = ranges; //TrimRanges(ranges,range_min,range_max);
     new_scan_.range_min = range_min;
     new_scan_.range_max = range_max;
     new_scan_.angle_min = angle_min;
@@ -206,24 +209,36 @@ void SLAM::ObserveLaser(const vector<float>& ranges,
   }
 }
 
+std::vector<float> SLAM::TrimRanges(const vector<float> &ranges, const float range_min, const float range_max)
+{
+  vector<float> trimmed_scan;
+
+  for (auto line : ranges)
+    {
+      if (line < range_max * 0.95 and line > range_min * 1.05)
+      {
+        trimmed_scan.push_back(line);
+      }
+    }
+
+  return trimmed_scan;
+}
+
 Observation SLAM::parse_laser_scan(const Observation &laser_scan)
 { // Parse the laser scan to a smaller number of ranges
   //return laser_scan;
   int laser_scan_size = laser_scan.ranges.size();
   Observation parsed_laser_scan;
-  parsed_laser_scan.range_min = laser_scan.range_min * 1.05;
-  parsed_laser_scan.range_max = laser_scan.range_max * 0.95;
-  parsed_laser_scan.angle_min = laser_scan.angle_min * 1.05;
-  parsed_laser_scan.angle_max = laser_scan.angle_max * 0.95;
+  parsed_laser_scan.range_min = laser_scan.range_min;
+  parsed_laser_scan.range_max = laser_scan.range_max;
+  parsed_laser_scan.angle_min = laser_scan.angle_min;
+  parsed_laser_scan.angle_max = laser_scan.angle_max;
   
   for(int i = 0; i < laser_scan_size; i++)
   {
     if ((i % num_ranges_to_skip_) == 0)
-    {
       parsed_laser_scan.ranges.push_back(laser_scan.ranges[i]);
-    }
   }
-  
   return parsed_laser_scan;
 }
 
