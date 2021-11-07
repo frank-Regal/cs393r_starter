@@ -211,10 +211,10 @@ Observation SLAM::parse_laser_scan(const Observation &laser_scan)
   //return laser_scan;
   int laser_scan_size = laser_scan.ranges.size();
   Observation parsed_laser_scan;
-  parsed_laser_scan.range_min = laser_scan.range_min;
-  parsed_laser_scan.range_max = laser_scan.range_max;
-  parsed_laser_scan.angle_min = laser_scan.angle_min;
-  parsed_laser_scan.angle_max = laser_scan.angle_max;
+  parsed_laser_scan.range_min = laser_scan.range_min * 1.05;
+  parsed_laser_scan.range_max = laser_scan.range_max * 0.95;
+  parsed_laser_scan.angle_min = laser_scan.angle_min * 1.05;
+  parsed_laser_scan.angle_max = laser_scan.angle_max * 0.95;
   
   for(int i = 0; i < laser_scan_size; i++)
   {
