@@ -306,7 +306,8 @@ Particle SLAM::CorrelativeScanMatching(Observation &new_laser_scan)
       float x_dist = new_point_cloud_last_pose.x() - last_point_cloud_[i].x();
       float y_dist = new_point_cloud_last_pose.y() - last_point_cloud_[i].y();
       float dist = pow(x_dist,2) + pow(y_dist,2);
-      observation_cost += exp(-(pow(dist,2) / pow(ray_std_dev_,2)));
+      //observation_cost += exp(-(pow(dist,2) / pow(ray_std_dev_,2)));
+      observation_cost += dist / ray_std_dev_;
     }
     
     // Calculate the Overall Likelihood of this pose based on weights from the observation and the motion model;
