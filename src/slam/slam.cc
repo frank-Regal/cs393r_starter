@@ -84,9 +84,10 @@ SLAM::SLAM() :
   min_angle_between_CSM_(30*M_PI/180), // radians (30 deg)
 
   // used for parsing point cloud
-  num_ranges_to_skip_(10),
+  num_ranges_to_skip_(5),
   update_scan_(false),
-  first_scan_(false)
+  first_scan_(false),
+  table_check_(false)
   {
     InitializeLookupTable();
   }
@@ -110,13 +111,16 @@ void SLAM::ObserveOdometry(const Vector2f& odom_loc, const float odom_angle) {
   if (!odom_initialized_){
     prev_odom_angle_ = odom_angle;
     prev_odom_loc_ = odom_loc;
-    mle_pose_ = Particle({Vector2f(0,0),0,0});
+    //mle_pose_ = Particle({Vector2f(0,0),0,0});
     odom_initialized_ = true;
     update_scan_ = false;
     first_scan_ = true;
     std::cout << "not init" << std::endl;
     return;
   }
+
+  // Keep track of odometry to estimate how far the robot has moved between 
+  // poses.
 
   // Calculate odom deltas for location and angle
   Vector2f distance = odom_loc - prev_odom_loc_;
@@ -125,21 +129,18 @@ void SLAM::ObserveOdometry(const Vector2f& odom_loc, const float odom_angle) {
   // Calculate the magnitude of the distance traveled
   float dist = distance.norm();
 
-  // Calculate the rotation matrix from odom to the most likely estimated pose
-  R_odom_to_mle = Eigen::Rotation2Df(mle_pose_.angle - prev_odom_angle_);
-
   // Update the pose called in GetPose() to return to the simulator
   give_pose_.loc = mle_pose_.loc + R_odom_to_mle*distance;
   give_pose_.angle = fmod(mle_pose_.angle + delta_angle + M_PI,2*M_PI) - M_PI;
   
   if(dist > min_dist_between_CSM_ or abs(delta_angle) > min_angle_between_CSM_){
     MotionModel(give_pose_.loc, give_pose_.angle, dist, delta_angle);
+    update_scan_ = true;
     prev_odom_angle_ = odom_angle;
     prev_odom_loc_ = odom_loc;
-    update_scan_ = true;
+    
   }
-  // Keep track of odometry to estimate how far the robot has moved between 
-  // poses.
+  
 }
 
 void SLAM::ObserveLaser(const vector<float>& ranges,
@@ -170,7 +171,7 @@ void SLAM::ObserveLaser(const vector<float>& ranges,
 
   //return;
 
-  if (update_scan_ == true and odom_initialized_ == true)
+  if (update_scan_ == true or (odom_initialized_ == true and not table_check_))
   {
     new_scan_.ranges    = TrimRanges(ranges,range_min,range_max);
     new_scan_.range_min = range_min;
@@ -184,10 +185,14 @@ void SLAM::ObserveLaser(const vector<float>& ranges,
               << "; mle_pose_.y(): " << mle_pose_.loc.y()
               << std::endl;
 
+    // Calculate the rotation matrix from odom to the most likely estimated pose
+    R_odom_to_mle = Eigen::Rotation2Df(mle_pose_.angle - prev_odom_angle_);
+
     ResetLookupTable();
     for(auto point : last_point_cloud_){
       ApplyGuassianBlur(point);
     }
+    table_check_ = true;
     update_scan_ = false;
   }
 }
@@ -198,7 +203,7 @@ void SLAM::InitializeLookupTable(){
   table_.min_cost = -800; 
   table_.overall_width = 10;
   table_.overall_height = 10;
-  table_.cell_resolution = 0.01;
+  table_.cell_resolution = 0.02;
   table_.cell_width = table_.overall_width/table_.cell_resolution;
   table_.cell_height = table_.overall_height/table_.cell_resolution;
   ResetLookupTable();
@@ -283,16 +288,18 @@ std::vector<Eigen::Vector2f> SLAM::to_point_cloud(const Observation &laser_scan)
   return point_cloud_out;
 }
 
-void SLAM::TF_to_robot_baselink(Observation &laser_scan)
-{ // Transform Point Cloud to Baselink
+void SLAM::TF_to_robot_baselink(Observation &laser_scan) // checked
+{ // Transform LaserScan to Baselink
   //return;
   float delta_angle = (laser_scan.angle_max - laser_scan.angle_min) / laser_scan.ranges.size();
   int laser_scan_size = laser_scan.ranges.size();
 
+  float angle_iter = laser_scan.angle_min;
   for(int i = 0; i < laser_scan_size; i++){
-    float x = laser_scan.ranges[i]*cos(delta_angle*i)-0.2;
-    float y = laser_scan.ranges[i]*sin(delta_angle*i);
+    float x = laser_scan.ranges[i]*cos(angle_iter)+0.2;
+    float y = laser_scan.ranges[i]*sin(angle_iter);
     laser_scan.ranges[i] = sqrt(pow(x,2) + pow(y,2));
+    angle_iter += delta_angle;
   }
   
 }
@@ -369,23 +376,15 @@ void SLAM::CombineMap(const Particle pose)
 
   for (int i {0}; i < num_ranges; i++)
   {
-    float x = pose.loc.x() + new_scan_.ranges[i]*cos(pose.angle + (angle_spacing * i) + angle);
-    float y = pose.loc.y() + new_scan_.ranges[i]*sin(pose.angle + (angle_spacing * i) + angle);
-    map.push_back(Vector2f(x,y));
+    point.x() = pose.loc.x() + new_scan_.ranges[i]*cos(pose.angle + (angle_spacing * i) + angle);
+    point.y() = pose.loc.y() + new_scan_.ranges[i]*sin(pose.angle + (angle_spacing * i) + angle);
+    map.push_back(point);
   }
-
-  /*
-  for (auto point : last_point_cloud_)
-    {
-      float x = mle_pose_.loc.x() + point.x();
-      float y = mle_pose_.loc.y() + point.y();
-      map.push_back(Vector2f(x,y));
-    }
-    last_point_cloud_.clear();
-  */
 }
 
 void SLAM::MotionModel(Eigen::Vector2f loc, float angle, float dist, float delta_angle){
+  particles_.push_back({{1,1},0,0});
+  return;
   particles_.clear();
 
   // Variance from particle filter motion model

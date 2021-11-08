@@ -150,10 +150,12 @@ class SLAM {
 
   bool update_scan_;
   bool first_scan_;
+  bool table_check_;
 
   Eigen::Rotation2Df R_odom_to_mle;
 
   std::vector<Eigen::Vector2f> map;
+  std::vector<Eigen::Vector2f> last_map;
 
   std::vector<float> inner_vec;
 
