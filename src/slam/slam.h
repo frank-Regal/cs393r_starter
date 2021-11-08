@@ -109,6 +109,8 @@ class SLAM {
 
   bool InCellBounds(int x, int y);
 
+  void ResetLookupTable();
+
  private:
 
   // Previous odometry-reported locations.
@@ -153,8 +155,9 @@ class SLAM {
 
   std::vector<Eigen::Vector2f> map;
 
-  std::vector<std::vector<float>>cell;
+  std::vector<float> inner_vec;
 
+  std::vector<std::vector<float>>cell;
 };
 }  // namespace slam
 

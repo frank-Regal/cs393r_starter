@@ -50,15 +50,13 @@ using std::vector;
 using vector_map::VectorMap;
 
 namespace slam {
-vector<Particle> particles_;
 
-// Most Likely Estimated pose
+vector<Particle> particles_;
 Particle mle_pose_;        // best pose updated every laser scan
 Particle give_pose_;       // output pose 
 Observation new_scan_;     // holder for new laser scan observed
 Observation initial_scan_; // initial scan
-LookupTable table_; // global lookup table
-
+LookupTable table_;        // global lookup table
 
 SLAM::SLAM() :
   prev_odom_loc_(0, 0),
@@ -93,25 +91,6 @@ SLAM::SLAM() :
     InitializeLookupTable();
   }
 
-void SLAM::InitializeLookupTable(){
-  table_.start_loc.x() = -5;
-  table_.start_loc.y() = -5;
-  table_.min_cost = -800; 
-  table_.overall_width = 10;
-  table_.overall_height = 10;
-  table_.cell_resolution = 0.01;
-  table_.cell_width = table_.overall_width/table_.cell_resolution;
-  table_.cell_height = table_.overall_height/table_.cell_resolution;
-
-  std::vector<float> inner_vec;
-  for (int j {0}; j < table_.cell_width; j++){
-    for (int k {0}; k < table_.cell_height; k++){
-      inner_vec.push_back(table_.min_cost);
-    }
-    cell.push_back(inner_vec);
-  }
-}
-
 void SLAM::GetPose(Eigen::Vector2f* loc, float* angle) const {
   // Return the latest pose estimate of the robot.
   *loc = give_pose_.loc;
@@ -125,14 +104,6 @@ std::vector<Eigen::Vector2f> SLAM::GetMap() {
     map.clear();
   
   return map;
-}
-
-Eigen::Vector2f SLAM::GetCellIndex(const Eigen::Vector2f loc) 
-{
-  Eigen::Vector2f xy_diff = loc - table_.start_loc;
-  int x_index = xy_diff.x() / table_.cell_resolution;
-  int y_index = xy_diff.y() / table_.cell_resolution;
-  return Eigen::Vector2f (x_index, y_index);
 }
 
 void SLAM::ObserveOdometry(const Vector2f& odom_loc, const float odom_angle) {
@@ -207,21 +178,49 @@ void SLAM::ObserveLaser(const vector<float>& ranges,
     new_scan_.angle_min = angle_min;
     new_scan_.angle_max = angle_max;
 
-    std::cout << "makes it to 1" << std::endl;
-    //std::cout << "table 735 and 1" << cell[735][1] << std::endl;
     mle_pose_ = CorrelativeScanMatching(new_scan_);
-
-    std::cout << "makes it to 2" << std::endl;
     CombineMap(mle_pose_);
+    std::cout << "mle_pose_.x(): " << mle_pose_.loc.x()
+              << "; mle_pose_.y(): " << mle_pose_.loc.y()
+              << std::endl;
 
-    std::cout << "makes it to 3" << std::endl;
+    ResetLookupTable();
     for(auto point : last_point_cloud_){
-          ApplyGuassianBlur(point);
+      ApplyGuassianBlur(point);
     }
-
-    std::cout << "makes it to 4" << std::endl;
     update_scan_ = false;
   }
+}
+
+void SLAM::InitializeLookupTable(){
+  table_.start_loc.x() = -5;
+  table_.start_loc.y() = -5;
+  table_.min_cost = -800; 
+  table_.overall_width = 10;
+  table_.overall_height = 10;
+  table_.cell_resolution = 0.01;
+  table_.cell_width = table_.overall_width/table_.cell_resolution;
+  table_.cell_height = table_.overall_height/table_.cell_resolution;
+  ResetLookupTable();
+}
+
+void SLAM::ResetLookupTable(){
+  inner_vec.clear();
+  cell.clear();
+  for (int j {0}; j < table_.cell_width; j++){
+    for (int k {0}; k < table_.cell_height; k++){
+      inner_vec.push_back(table_.min_cost);
+    }
+    cell.push_back(inner_vec);
+  }
+}
+
+Eigen::Vector2f SLAM::GetCellIndex(const Eigen::Vector2f loc) 
+{
+  Eigen::Vector2f xy_diff = loc - table_.start_loc;
+  int x_index = xy_diff.x() / table_.cell_resolution;
+  int y_index = xy_diff.y() / table_.cell_resolution;
+  return Eigen::Vector2f (x_index, y_index);
 }
 
 std::vector<float> SLAM::TrimRanges(const vector<float> &ranges, const float range_min, const float range_max)
@@ -316,63 +315,6 @@ bool SLAM::InCellBounds(int x, int y){
     return(true);
   else
     return(false);
-}
-
-Particle SLAM::CorrelativeScanMatching(Observation &new_laser_scan) 
-{ // Match up Laser Scans and Return the most likely estimated pose (mle_pose_)
-  //return mle_pose_;
-  max_particle_cost_ = 0;
-
-  // parse the incoming laser scan to be more manageable
-  Observation parsed_laser_scan = parse_laser_scan(new_laser_scan);
-  
-  // Transfer new_laser_scan to Baselink of Robot
-  TF_to_robot_baselink(parsed_laser_scan);
-
-  // convert to a point cloud  
-  std::vector<Eigen::Vector2f> new_point_cloud = to_point_cloud(parsed_laser_scan);
-  
-  int point_cloud_size = new_point_cloud.size();
-  //int last_point_cloud_size = last_point_cloud_.size();
-
-  // Loop through all particles_ from motion model to find best pose
-  for (const auto &particle:particles_)
-  {
-    // cost of the laser scan
-    float particle_pose_cost {0};
-    float observation_cost {0};
-
-    // transform this laser scan's point cloud to last pose's base_link
-    for (int i {0}; i < point_cloud_size; i++)
-    {
-      Eigen::Vector2f new_point_cloud_last_pose = TF_cloud_to_last_pose(new_point_cloud[i], particle);
-      Eigen::Vector2f new_cost_index = GetCellIndex(new_point_cloud_last_pose);
-      
-      if(InCellBounds(new_cost_index.x(), new_cost_index.y()))
-      {
-        observation_cost += cell[new_cost_index.x()][new_cost_index.y()];
-      }
-      else 
-        continue;
-
-    }
-    
-    // Calculate the Overall Likelihood of this pose based on weights from the observation and the motion model;
-    particle_pose_cost = (observation_cost * observation_weight_) +
-                          (particle.weight * motion_model_weight_);
-    
-    // If this particle is a very high probability, set it as the best guess
-    if (particle_pose_cost > max_particle_cost_)
-    {
-      mle_pose_.angle  = particle.angle;
-      mle_pose_.loc    = particle.loc;
-      mle_pose_.weight = particle.weight;
-      max_particle_cost_ = particle_pose_cost;
-    }
-  }
-  last_point_cloud_ = new_point_cloud;
-
-  return mle_pose_;
 }
 
 void SLAM::ApplyGuassianBlur(const Eigen::Vector2f point)
@@ -472,5 +414,63 @@ void SLAM::MotionModel(Eigen::Vector2f loc, float angle, float dist, float delta
     }
   }
 }
+
+Particle SLAM::CorrelativeScanMatching(Observation &new_laser_scan) 
+{ // Match up Laser Scans and Return the most likely estimated pose (mle_pose_)
+  //return mle_pose_;
+  max_particle_cost_ = 0;
+
+  // parse the incoming laser scan to be more manageable
+  Observation parsed_laser_scan = parse_laser_scan(new_laser_scan);
+  
+  // Transfer new_laser_scan to Baselink of Robot
+  TF_to_robot_baselink(parsed_laser_scan);
+
+  // convert to a point cloud  
+  std::vector<Eigen::Vector2f> new_point_cloud = to_point_cloud(parsed_laser_scan);
+  
+  int point_cloud_size = new_point_cloud.size();
+  //int last_point_cloud_size = last_point_cloud_.size();
+
+  // Loop through all particles_ from motion model to find best pose
+  for (const auto &particle:particles_)
+  {
+    // cost of the laser scan
+    float particle_pose_cost {0};
+    float observation_cost {0};
+
+    // transform this laser scan's point cloud to last pose's base_link
+    for (int i {0}; i < point_cloud_size; i++)
+    {
+      Eigen::Vector2f new_point_cloud_last_pose = TF_cloud_to_last_pose(new_point_cloud[i], particle);
+      Eigen::Vector2f new_cost_index = GetCellIndex(new_point_cloud_last_pose);
+      
+      if(InCellBounds(new_cost_index.x(), new_cost_index.y()))
+      {
+        observation_cost += cell[new_cost_index.x()][new_cost_index.y()];
+      }
+      else 
+        continue;
+    }
+    
+    //std::cout << "Observation Cost: " << observation_cost << std::endl;
+    // Calculate the Overall Likelihood of this pose based on weights from the observation and the motion model;
+    particle_pose_cost = (observation_cost * observation_weight_) +
+                          (particle.weight * motion_model_weight_);
+    //std::cout << "particle_pose_cost: " << particle_pose_cost << std::endl;
+    // If this particle is a very high probability, set it as the best guess
+    if (particle_pose_cost < max_particle_cost_)
+    {
+      mle_pose_.angle  = particle.angle;
+      mle_pose_.loc    = particle.loc;
+      mle_pose_.weight = particle.weight;
+      max_particle_cost_ = particle_pose_cost;
+    }
+  }
+  last_point_cloud_ = new_point_cloud;
+
+  return mle_pose_;
+}
+
 
 }  // namespace slam
