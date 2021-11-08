@@ -208,7 +208,7 @@ void SLAM::ObserveLaser(const vector<float>& ranges,
     new_scan_.angle_max = angle_max;
 
     std::cout << "makes it to 1" << std::endl;
-    std::cout << "table 735 and 1" << cell[735][1] << std::endl;
+    //std::cout << "table 735 and 1" << cell[735][1] << std::endl;
     mle_pose_ = CorrelativeScanMatching(new_scan_);
 
     std::cout << "makes it to 2" << std::endl;
@@ -230,9 +230,11 @@ std::vector<float> SLAM::TrimRanges(const vector<float> &ranges, const float ran
 
   for (auto line : ranges)
     {
-      if (line < range_max * 0.95)
+      if (line < range_max * 0.95 and line > range_min * 1.05)
       {
         trimmed_scan.push_back(line);
+      }else{
+        trimmed_scan.push_back(0);
       }
     }
 
@@ -269,10 +271,14 @@ std::vector<Eigen::Vector2f> SLAM::to_point_cloud(const Observation &laser_scan)
 
   for (int i {0}; i < num_ranges; i++)
   {
+    if(laser_scan.ranges[i] == 0){
+      continue;
+    }else{
     point.x() = laser_scan.ranges[i] * cos(angle);
     point.y() = laser_scan.ranges[i] * sin(angle);
     point_cloud_out.push_back(point);
     angle += angle_spacing;
+    }
   }
 
   return point_cloud_out;
