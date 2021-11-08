@@ -54,7 +54,6 @@ struct LookupTable {
   float cell_resolution;
   int cell_width;
   int cell_height;
-  std::vector<std::vector<float>>cell;
 };
 
 class SLAM {
@@ -153,6 +152,8 @@ class SLAM {
   Eigen::Rotation2Df R_odom_to_mle;
 
   std::vector<Eigen::Vector2f> map;
+
+  std::vector<std::vector<float>>cell;
 
 };
 }  // namespace slam

@@ -108,11 +108,8 @@ void SLAM::InitializeLookupTable(){
     for (int k {0}; k < table_.cell_height; k++){
       inner_vec.push_back(table_.min_cost);
     }
-    table_.cell.push_back(inner_vec);
+    cell.push_back(inner_vec);
   }
-
-  std::cout << table_.cell[735][1] << std::endl;
-
 }
 
 void SLAM::GetPose(Eigen::Vector2f* loc, float* angle) const {
@@ -185,7 +182,7 @@ void SLAM::ObserveLaser(const vector<float>& ranges,
   
   if (first_scan_ == true and odom_initialized_ == true)
   {
-    initial_scan_.ranges    = ranges; //TrimRanges(ranges,range_min,range_max);
+    initial_scan_.ranges    = TrimRanges(ranges,range_min,range_max);
     initial_scan_.range_min = range_min;
     initial_scan_.range_max = range_max;
     initial_scan_.angle_min = angle_min;
@@ -204,13 +201,14 @@ void SLAM::ObserveLaser(const vector<float>& ranges,
 
   if (update_scan_ == true and odom_initialized_ == true)
   {
-    new_scan_.ranges    = ranges; //TrimRanges(ranges,range_min,range_max);
+    new_scan_.ranges    = TrimRanges(ranges,range_min,range_max);
     new_scan_.range_min = range_min;
     new_scan_.range_max = range_max;
     new_scan_.angle_min = angle_min;
     new_scan_.angle_max = angle_max;
 
     std::cout << "makes it to 1" << std::endl;
+    std::cout << "table 735 and 1" << cell[735][1] << std::endl;
     mle_pose_ = CorrelativeScanMatching(new_scan_);
 
     std::cout << "makes it to 2" << std::endl;
@@ -337,42 +335,19 @@ Particle SLAM::CorrelativeScanMatching(Observation &new_laser_scan)
     // cost of the laser scan
     float particle_pose_cost {0};
     float observation_cost {0};
-    std::cout << "** NEW PARTICLE **" << std::endl;
+
     // transform this laser scan's point cloud to last pose's base_link
     for (int i {0}; i < point_cloud_size; i++)
     {
       Eigen::Vector2f new_point_cloud_last_pose = TF_cloud_to_last_pose(new_point_cloud[i], particle);
-      std::cout << "makes it to 1a" << std::endl;
-      std::cout << "new_point_cloud_last_pose.x(): " << new_point_cloud_last_pose.x()
-                  << "; new_point_cloud_last_pose.y(): " << new_point_cloud_last_pose.y()
-                  << std::endl;
-
       Eigen::Vector2f new_cost_index = GetCellIndex(new_point_cloud_last_pose);
-      std::cout << "makes it to 1b" << std::endl;
-      std::cout << "new_cost_index.x(): " << new_cost_index.x()
-                << "; new_cost_index.y(): " << new_cost_index.y()
-                << std::endl;
-
-           
       
       if(InCellBounds(new_cost_index.x(), new_cost_index.y()))
       {
-        std::cout << "[in if:] new_cost_index.x(): " << new_cost_index.x()
-                  << "; [in if:] new_cost_index.y(): " << new_cost_index.y()
-                  << std::endl;
-        observation_cost += table_.cell[new_cost_index.x()][new_cost_index.y()];
-        std::cout << "observation_cost: " << observation_cost << std::endl;
+        observation_cost += cell[new_cost_index.x()][new_cost_index.y()];
       }
       else 
         continue;
-      
-      //observation_cost += table_.cell[new_cost_index.x()][new_cost_index.y()];
-      //std::cout << "makes it to 1c" << std::endl;
-      // float x_dist = new_point_cloud_last_pose.x() - last_point_cloud_[i].x();
-      // float y_dist = new_point_cloud_last_pose.y() - last_point_cloud_[i].y();
-      // float dist = pow(x_dist,2) + pow(y_dist,2);
-      // observation_cost += exp(-(pow(dist,2) / pow(ray_std_dev_,2)));
-      // observation_cost += dist / ray_std_dev_;
 
     }
     
@@ -419,13 +394,13 @@ void SLAM::ApplyGuassianBlur(const Eigen::Vector2f point)
       
       // Updated Each Grid Cell with Log-Likelihood Weight
       if (InCellBounds(i.x()+xi, i.y()+yi))
-        table_.cell[i.x()+xi][i.y()+yi] = std::max(table_.cell[i.x()+xi][i.y()+yi],log_likelihood);
+        cell[i.x()+xi][i.y()+yi] = std::max(cell[i.x()+xi][i.y()+yi],log_likelihood);
       if (InCellBounds(i.x()+xi, i.y()-yi))
-        table_.cell[i.x()+xi][i.y()-yi] = std::max(table_.cell[i.x()+xi][i.y()-yi],log_likelihood);
+        cell[i.x()+xi][i.y()-yi] = std::max(cell[i.x()+xi][i.y()-yi],log_likelihood);
       if (InCellBounds(i.x()-xi, i.y()+yi))
-        table_.cell[i.x()-xi][i.y()+yi] = std::max(table_.cell[i.x()-xi][i.y()+yi],log_likelihood);
+        cell[i.x()-xi][i.y()+yi] = std::max(cell[i.x()-xi][i.y()+yi],log_likelihood);
       if (InCellBounds(i.x()-xi, i.y()-yi))
-        table_.cell[i.x()-xi][i.y()-yi] = std::max(table_.cell[i.x()-xi][i.y()-yi],log_likelihood);
+        cell[i.x()-xi][i.y()-yi] = std::max(cell[i.x()-xi][i.y()-yi],log_likelihood);
     
       // Increase Iter
       k++;      
