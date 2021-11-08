@@ -52,9 +52,9 @@ struct LookupTable {
   float overall_width;        // max width of big lookup table
   float overall_height;
   float cell_resolution;
-  int cell_width = overall_width/cell_resolution;
-  int cell_height = overall_height/cell_resolution;
-  std::vector< std::vector<float> >cell;
+  int cell_width;
+  int cell_height;
+  std::vector<std::vector<float>>cell;
 };
 
 class SLAM {

@@ -100,9 +100,19 @@ void SLAM::InitializeLookupTable(){
   table_.overall_width = 10;
   table_.overall_height = 10;
   table_.cell_resolution = 0.01;
-  table_.cell.resize(table_.cell_width);
-  for(auto i : table_.cell)
-    i.resize(table_.cell_height);
+  table_.cell_width = table_.overall_width/table_.cell_resolution;
+  table_.cell_height = table_.overall_height/table_.cell_resolution;
+
+  std::vector<float> inner_vec;
+  for (int j {0}; j < table_.cell_width; j++){
+    for (int k {0}; k < table_.cell_height; k++){
+      inner_vec.push_back(table_.min_cost);
+    }
+    table_.cell.push_back(inner_vec);
+  }
+
+  std::cout << table_.cell[735][1] << std::endl;
+
 }
 
 void SLAM::GetPose(Eigen::Vector2f* loc, float* angle) const {
@@ -187,7 +197,6 @@ void SLAM::ObserveLaser(const vector<float>& ranges,
     last_point_cloud_ = to_point_cloud(initial_scan_);
     for (auto point : last_point_cloud_)
       map.push_back(point);
-
     first_scan_ = false;
   }
 
@@ -200,14 +209,18 @@ void SLAM::ObserveLaser(const vector<float>& ranges,
     new_scan_.range_max = range_max;
     new_scan_.angle_min = angle_min;
     new_scan_.angle_max = angle_max;
+
     std::cout << "makes it to 1" << std::endl;
     mle_pose_ = CorrelativeScanMatching(new_scan_);
+
     std::cout << "makes it to 2" << std::endl;
     CombineMap(mle_pose_);
+
     std::cout << "makes it to 3" << std::endl;
     for(auto point : last_point_cloud_){
           ApplyGuassianBlur(point);
     }
+
     std::cout << "makes it to 4" << std::endl;
     update_scan_ = false;
   }
@@ -294,7 +307,7 @@ Eigen::Vector2f SLAM::TF_cloud_to_last_pose(const Eigen::Vector2f cur_points, co
 
 bool SLAM::InCellBounds(int x, int y){
   bool check_x = (x >= 0 and x < table_.cell_width);
-  bool check_y = (x >= 0 and x < table_.cell_width);
+  bool check_y = (y >= 0 and y < table_.cell_height);
   if(check_x and check_y)
     return(true);
   else
@@ -324,17 +337,37 @@ Particle SLAM::CorrelativeScanMatching(Observation &new_laser_scan)
     // cost of the laser scan
     float particle_pose_cost {0};
     float observation_cost {0};
-
+    std::cout << "** NEW PARTICLE **" << std::endl;
     // transform this laser scan's point cloud to last pose's base_link
     for (int i {0}; i < point_cloud_size; i++)
     {
       Eigen::Vector2f new_point_cloud_last_pose = TF_cloud_to_last_pose(new_point_cloud[i], particle);
+      std::cout << "makes it to 1a" << std::endl;
+      std::cout << "new_point_cloud_last_pose.x(): " << new_point_cloud_last_pose.x()
+                  << "; new_point_cloud_last_pose.y(): " << new_point_cloud_last_pose.y()
+                  << std::endl;
+
       Eigen::Vector2f new_cost_index = GetCellIndex(new_point_cloud_last_pose);
+      std::cout << "makes it to 1b" << std::endl;
+      std::cout << "new_cost_index.x(): " << new_cost_index.x()
+                << "; new_cost_index.y(): " << new_cost_index.y()
+                << std::endl;
+
+           
+      
       if(InCellBounds(new_cost_index.x(), new_cost_index.y()))
+      {
+        std::cout << "[in if:] new_cost_index.x(): " << new_cost_index.x()
+                  << "; [in if:] new_cost_index.y(): " << new_cost_index.y()
+                  << std::endl;
         observation_cost += table_.cell[new_cost_index.x()][new_cost_index.y()];
+        std::cout << "observation_cost: " << observation_cost << std::endl;
+      }
       else 
         continue;
       
+      //observation_cost += table_.cell[new_cost_index.x()][new_cost_index.y()];
+      //std::cout << "makes it to 1c" << std::endl;
       // float x_dist = new_point_cloud_last_pose.x() - last_point_cloud_[i].x();
       // float y_dist = new_point_cloud_last_pose.y() - last_point_cloud_[i].y();
       // float dist = pow(x_dist,2) + pow(y_dist,2);
