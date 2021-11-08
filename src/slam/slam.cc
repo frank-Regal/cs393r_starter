@@ -57,38 +57,53 @@ Particle mle_pose_;        // best pose updated every laser scan
 Particle give_pose_;       // output pose 
 Observation new_scan_;     // holder for new laser scan observed
 Observation initial_scan_; // initial scan
+LookupTable table_; // global lookup table
 
 
 SLAM::SLAM() :
-    prev_odom_loc_(0, 0),
-    prev_odom_angle_(0),
-    odom_initialized_(false), 
+  prev_odom_loc_(0, 0),
+  prev_odom_angle_(0),
+  odom_initialized_(false), 
 
-    // tunable parameters: CSM
-    max_particle_cost_(0),
-    observation_weight_(1),
-    motion_model_weight_(1),
-    ray_std_dev_(0.15),
+  // tunable parameters: CSM
+  max_particle_cost_(0),
+  observation_weight_(3),
+  motion_model_weight_(1),
+  ray_std_dev_(0.15),
 
-    // tunable parameters: MotionModel
-    a1_(0.2), // trans 
-    a2_(0.1), // trans 
-    a3_(0.4), // angle
-    a4_(0.1), // angle   //a's taken from particle_filter.cc
+  // tunable parameters: MotionModel
+  a1_(0.2), // trans 
+  a2_(0.1), // trans 
+  a3_(0.4), // angle
+  a4_(0.1), // angle   //a's taken from particle_filter.cc
 
-    num_x_(10),     // motion resolution in x
-    num_y_(10),     // motion resolution in y
-    num_angle_(30),  // motion resolution in angle
+  num_x_(10),     // motion resolution in x
+  num_y_(10),     // motion resolution in y
+  num_angle_(30),  // motion resolution in angle
 
-    // tunable parameters: ObserveOdometry
-    min_dist_between_CSM_(0.5),  // meters
-    min_angle_between_CSM_(30*M_PI/180), // radians (30 deg)
+  // tunable parameters: ObserveOdometry
+  min_dist_between_CSM_(0.5),  // meters
+  min_angle_between_CSM_(30*M_PI/180), // radians (30 deg)
 
-    // used for parsing point cloud
-    num_ranges_to_skip_(10),
-    update_scan_(false),
-    first_scan_(false)
-    {}
+  // used for parsing point cloud
+  num_ranges_to_skip_(10),
+  update_scan_(false),
+  first_scan_(false)
+  {
+    InitializeLookupTable();
+  }
+
+void SLAM::InitializeLookupTable(){
+  table_.start_loc.x() = -5;
+  table_.start_loc.y() = -5;
+  table_.min_cost = -800; 
+  table_.overall_width = 10;
+  table_.overall_height = 10;
+  table_.cell_resolution = 0.01;
+  table_.cell.resize(table_.cell_width);
+  for(auto i : table_.cell)
+    i.resize(table_.cell_height);
+}
 
 void SLAM::GetPose(Eigen::Vector2f* loc, float* angle) const {
   // Return the latest pose estimate of the robot.
@@ -105,6 +120,14 @@ std::vector<Eigen::Vector2f> SLAM::GetMap() {
   return map;
 }
 
+Eigen::Vector2f SLAM::GetCellIndex(const Eigen::Vector2f loc) 
+{
+  Eigen::Vector2f xy_diff = loc - table_.start_loc;
+  int x_index = xy_diff.x() / table_.cell_resolution;
+  int y_index = xy_diff.y() / table_.cell_resolution;
+  return Eigen::Vector2f (x_index, y_index);
+}
+
 void SLAM::ObserveOdometry(const Vector2f& odom_loc, const float odom_angle) {
   if (!odom_initialized_){
     prev_odom_angle_ = odom_angle;
@@ -113,6 +136,7 @@ void SLAM::ObserveOdometry(const Vector2f& odom_loc, const float odom_angle) {
     odom_initialized_ = true;
     update_scan_ = false;
     first_scan_ = true;
+    std::cout << "not init" << std::endl;
     return;
   }
 
@@ -132,40 +156,12 @@ void SLAM::ObserveOdometry(const Vector2f& odom_loc, const float odom_angle) {
   
   if(dist > min_dist_between_CSM_ or abs(delta_angle) > min_angle_between_CSM_){
     MotionModel(give_pose_.loc, give_pose_.angle, dist, delta_angle);
-    
-    /*
-    for (auto part : particles_)
-    {
-      std::cout << "Loc x: " << part.loc.x()
-                << "; Loc y: " << part.loc.y()
-                << "; angle: " << part.angle
-                << "; weight: " << part.weight
-                << std::endl;
-    }
-    */
-
     prev_odom_angle_ = odom_angle;
     prev_odom_loc_ = odom_loc;
     update_scan_ = true;
   }
   // Keep track of odometry to estimate how far the robot has moved between 
   // poses.
-
-  /*
-  std::cout << "distance: " << distance.x() 
-            << "; delta angle: " << delta_angle
-            << "; dist: " << dist
-            //<< "; R_odom_to_mle:  " << R_odom_to_mle.angle
-            << std::endl;
-  */
-
-  /*
-  std::cout << "Loc x: " << give_pose_.loc.x()
-                << "; Loc y: " << give_pose_.loc.y()
-                << "; angle: " << give_pose_.angle
-                << std::endl;
-  */
-
 }
 
 void SLAM::ObserveLaser(const vector<float>& ranges,
@@ -205,6 +201,9 @@ void SLAM::ObserveLaser(const vector<float>& ranges,
 
     mle_pose_ = CorrelativeScanMatching(new_scan_);
     CombineMap(mle_pose_);
+    for(auto point : last_point_cloud_){
+          ApplyGuassianBlur(point);
+    }
     update_scan_ = false;
   }
 }
@@ -215,7 +214,7 @@ std::vector<float> SLAM::TrimRanges(const vector<float> &ranges, const float ran
 
   for (auto line : ranges)
     {
-      if (line < range_max * 0.95 and line > range_min * 1.05)
+      if (line < range_max * 0.95)
       {
         trimmed_scan.push_back(line);
       }
@@ -270,7 +269,7 @@ void SLAM::TF_to_robot_baselink(Observation &laser_scan)
   int laser_scan_size = laser_scan.ranges.size();
 
   for(int i = 0; i < laser_scan_size; i++){
-    float x = laser_scan.ranges[i]*cos(delta_angle*i)+0.2;
+    float x = laser_scan.ranges[i]*cos(delta_angle*i)-0.2;
     float y = laser_scan.ranges[i]*sin(delta_angle*i);
     laser_scan.ranges[i] = sqrt(pow(x,2) + pow(y,2));
   }
@@ -286,8 +285,16 @@ Eigen::Vector2f SLAM::TF_cloud_to_last_pose(const Eigen::Vector2f cur_points, co
   Eigen::Rotation2Df R_odom_change(odom_delta_angle);
   Vector2f new_point_cloud_last_pose = R_mle_change*odom_diff + R_odom_change*cur_points;
   return new_point_cloud_last_pose;
-  
-  }
+}
+
+bool SLAM::InCellBounds(int x, int y){
+  bool check_x = (x >= 0 and x < table_.cell_width);
+  bool check_y = (x >= 0 and x < table_.cell_width);
+  if(check_x and check_y)
+    return(true);
+  else
+    return(false);
+}
 
 Particle SLAM::CorrelativeScanMatching(Observation &new_laser_scan) 
 { // Match up Laser Scans and Return the most likely estimated pose (mle_pose_)
@@ -304,7 +311,8 @@ Particle SLAM::CorrelativeScanMatching(Observation &new_laser_scan)
   std::vector<Eigen::Vector2f> new_point_cloud = to_point_cloud(parsed_laser_scan);
   
   int point_cloud_size = new_point_cloud.size();
-  
+  //int last_point_cloud_size = last_point_cloud_.size();
+
   // Loop through all particles_ from motion model to find best pose
   for (const auto &particle:particles_)
   {
@@ -316,11 +324,17 @@ Particle SLAM::CorrelativeScanMatching(Observation &new_laser_scan)
     for (int i {0}; i < point_cloud_size; i++)
     {
       Vector2f new_point_cloud_last_pose = TF_cloud_to_last_pose(new_point_cloud[i], particle);
-      float x_dist = new_point_cloud_last_pose.x() - last_point_cloud_[i].x();
-      float y_dist = new_point_cloud_last_pose.y() - last_point_cloud_[i].y();
-      float dist = pow(x_dist,2) + pow(y_dist,2);
-      //observation_cost += exp(-(pow(dist,2) / pow(ray_std_dev_,2)));
-      observation_cost += dist / ray_std_dev_;
+      Eigen::Vector2f new_cost_index = GetCellIndex(new_point_cloud_last_pose);
+      if(InCellBounds(new_cost_index.x(), new_cost_index.y()))
+        observation_cost += table_.cell[new_cost_index.x()][new_cost_index.y()];
+      else 
+        continue;
+      
+      // float x_dist = new_point_cloud_last_pose.x() - last_point_cloud_[i].x();
+      // float y_dist = new_point_cloud_last_pose.y() - last_point_cloud_[i].y();
+      // float dist = pow(x_dist,2) + pow(y_dist,2);
+      //o bservation_cost += exp(-(pow(dist,2) / pow(ray_std_dev_,2)));
+      // observation_cost += dist / ray_std_dev_;
     }
     
     // Calculate the Overall Likelihood of this pose based on weights from the observation and the motion model;
@@ -336,15 +350,52 @@ Particle SLAM::CorrelativeScanMatching(Observation &new_laser_scan)
       max_particle_cost_ = particle_pose_cost;
     }
   }
-  /*
-  for (auto point_cloud : new_point_cloud)
-  {
-
-  }
-  */
   last_point_cloud_ = new_point_cloud;
 
   return mle_pose_;
+}
+
+void SLAM::ApplyGuassianBlur(const Eigen::Vector2f point)
+{ // Fills the lookup table with log likelihoods for each cell within the table
+  Eigen::Vector2f i = GetCellIndex(point);
+  
+  float xi {0};
+  float yi {0};
+  float magnitude_from_point {0};
+  float log_likelihood {0};
+  
+  // Loop through all x- & y-cells
+  int j {0}; 
+  bool log_likelihood_x {true};
+  while (log_likelihood_x == true)
+  { 
+    int k {0};
+    while (log_likelihood > table_.min_cost)
+    {
+      // Calculate Log Likelihoods 
+      xi = table_.cell_resolution*j;
+      yi = table_.cell_resolution*k;
+      magnitude_from_point = pow(xi,2) + pow(yi,2);
+      log_likelihood = -magnitude_from_point / pow(ray_std_dev_,2);
+      
+      // Updated Each Grid Cell with Log-Likelihood Weight
+      if (InCellBounds(i.x()+xi, i.y()+yi))
+        table_.cell[i.x()+xi][i.y()+yi] = std::max(table_.cell[i.x()+xi][i.y()+yi],log_likelihood);
+      if (InCellBounds(i.x()+xi, i.y()-yi))
+        table_.cell[i.x()+xi][i.y()-yi] = std::max(table_.cell[i.x()+xi][i.y()-yi],log_likelihood);
+      if (InCellBounds(i.x()-xi, i.y()+yi))
+        table_.cell[i.x()-xi][i.y()+yi] = std::max(table_.cell[i.x()-xi][i.y()+yi],log_likelihood);
+      if (InCellBounds(i.x()-xi, i.y()-yi))
+        table_.cell[i.x()-xi][i.y()-yi] = std::max(table_.cell[i.x()-xi][i.y()-yi],log_likelihood);
+    
+      // Increase Iter
+      k++;      
+    }
+    j++;
+    log_likelihood_x = -(pow(j*table_.cell_resolution, 2) / pow(ray_std_dev_,2)) > table_.min_cost; 
+  }  
+    
+
 }
 
 void SLAM::CombineMap(const Particle pose)

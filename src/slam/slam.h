@@ -46,6 +46,17 @@ struct Observation {
   float angle_max;
 };
 
+struct LookupTable {
+  Eigen::Vector2f start_loc;  // starting location for lookup table
+  float min_cost;
+  float overall_width;        // max width of big lookup table
+  float overall_height;
+  float cell_resolution;
+  int cell_width = overall_width/cell_resolution;
+  int cell_height = overall_height/cell_resolution;
+  std::vector< std::vector<float> >cell;
+};
+
 class SLAM {
  public:
   // Default Constructor.
@@ -90,6 +101,14 @@ class SLAM {
   void CombineMap(const Particle pose);
 
   std::vector<float> TrimRanges(const std::vector<float> &ranges, const float range_min, const float range_max);
+
+  void InitializeLookupTable();
+  
+  void ApplyGuassianBlur(const Eigen::Vector2f point);
+
+  Eigen::Vector2f GetCellIndex(const Eigen::Vector2f loc);
+
+  bool InCellBounds(int x, int y);
 
  private:
 
