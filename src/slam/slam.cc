@@ -173,7 +173,7 @@ void SLAM::ObserveLaser(const vector<float>& ranges,
 
   if (update_scan_ == true or (odom_initialized_ == true and not table_check_))
   {
-    new_scan_.ranges    = ranges; //TrimRanges(ranges,range_min,range_max);
+    new_scan_.ranges    = TrimRanges(ranges,range_min,range_max);
     new_scan_.range_min = range_min;
     new_scan_.range_max = range_max;
     new_scan_.angle_min = angle_min;
@@ -300,7 +300,7 @@ void SLAM::TF_to_robot_baselink(Observation &laser_scan) // checked
   float angle_iter = laser_scan.angle_min;
   for(int i = 0; i < laser_scan_size; i++){
     float x = laser_scan.ranges[i]*cos(angle_iter)-0.2;
-    float y = laser_scan.ranges[i]*sin(angle_iter)-0.2;
+    float y = laser_scan.ranges[i]*sin(angle_iter);
     laser_scan.ranges[i] = sqrt(pow(x,2) + pow(y,2));
     angle_iter += delta_angle;
   }

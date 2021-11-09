@@ -82,7 +82,7 @@ class SLAM {
   void GetPose(Eigen::Vector2f* loc, float* angle) const;
 
   // Successive Scan Matching Method (Refrence: Olson, 2009)
-  Particle CorrelativeScanMatching(const Observation &new_laser_scan);
+  Particle CorrelativeScanMatching(Observation &new_laser_scan);
 
   // Parse the laser scan to a smaller number of ranges
   Observation parse_laser_scan(const Observation &laser_scan);
