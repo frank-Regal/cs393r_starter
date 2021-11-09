@@ -65,7 +65,7 @@ SLAM::SLAM() :
 
   // tunable parameters: CSM
   max_particle_cost_(0),
-  observation_weight_(3),
+  observation_weight_(4),
   motion_model_weight_(1),
   ray_std_dev_(0.01),
 
@@ -150,30 +150,10 @@ void SLAM::ObserveLaser(const vector<float>& ranges,
   // A new laser scan has been observed. Decide whether to add it as a pose
   // for SLAM. If decided to add, align it to the scan from the last saved pose,
   // and save both the scan and the optimized pose.
-  /*
-  if (first_scan_ == true and odom_initialized_ == true)
-  {
-    initial_scan_.ranges    = TrimRanges(ranges,range_min,range_max);
-    initial_scan_.range_min = range_min;
-    initial_scan_.range_max = range_max;
-    initial_scan_.angle_min = angle_min;
-    initial_scan_.angle_max = angle_max;
-
-    initial_scan_ = parse_laser_scan(initial_scan_);
-
-    TF_to_robot_baselink(initial_scan_);
-    last_point_cloud_ = to_point_cloud(initial_scan_);
-    for (auto point : last_point_cloud_)
-      map.push_back(point);
-    first_scan_ = false;
-  }
-  */
-
-  // return;
 
   if (update_scan_ == true or (odom_initialized_ == true and not table_check_))
   {
-    new_scan_.ranges    = TrimRanges(ranges,range_min,range_max);
+    new_scan_.ranges    = ranges; //TrimRanges(ranges,range_min,range_max);
     new_scan_.range_min = range_min;
     new_scan_.range_max = range_max;
     new_scan_.angle_min = angle_min;
@@ -189,7 +169,10 @@ void SLAM::ObserveLaser(const vector<float>& ranges,
     R_odom_to_mle = Eigen::Rotation2Df(mle_pose_.angle - prev_odom_angle_);
 
     ResetLookupTable();
-    for(auto point : last_point_cloud_){
+    // TODO
+    TF_to_robot_baselink(new_scan_);
+    std::vector<Eigen::Vector2f> tf_point_cloud = to_point_cloud(new_scan_);
+    for(auto point : tf_point_cloud){
       ApplyGuassianBlur(point);
     }
     table_check_ = true;
@@ -277,14 +260,10 @@ std::vector<Eigen::Vector2f> SLAM::to_point_cloud(const Observation &laser_scan)
 
   for (int i {0}; i < num_ranges; i++)
   {
-    if(laser_scan.ranges[i] == 0){
-      continue;
-    }else{
     point.x() = laser_scan.ranges[i] * cos(angle);
     point.y() = laser_scan.ranges[i] * sin(angle);
     point_cloud_out.push_back(point);
     angle += angle_spacing;
-    }
   }
 
   return point_cloud_out;
@@ -481,7 +460,6 @@ Particle SLAM::CorrelativeScanMatching(const Observation &new_laser_scan)
     }
   }
   //last_point_cloud_ = new_point_cloud;
-  std::cout << "updated last_point_cloud" << std::endl;
   return csm_pose;
 }
 
