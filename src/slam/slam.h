@@ -24,11 +24,37 @@
 
 #include "eigen3/Eigen/Dense"
 #include "eigen3/Eigen/Geometry"
+#include "shared/util/random.h"
 
 #ifndef SRC_SLAM_H_
 #define SRC_SLAM_H_
 
 namespace slam {
+
+struct Particle {
+  Eigen::Vector2f loc;
+  float angle;
+  double weight;
+};
+
+struct Observation {
+  // Struct to Hold Observation from Laser Scan
+  std::vector<float> ranges;
+  float range_min;
+  float range_max;
+  float angle_min;
+  float angle_max;
+};
+
+struct LookupTable {
+  Eigen::Vector2f start_loc;  // starting location for lookup table
+  float min_cost;
+  float overall_width;        // max width of big lookup table
+  float overall_height;
+  float cell_resolution;
+  int cell_width;
+  int cell_height;
+};
 
 class SLAM {
  public:
@@ -42,6 +68,9 @@ class SLAM {
                     float angle_min,
                     float angle_max);
 
+  // Possible robot poses
+  void MotionModel(Eigen::Vector2f loc, float angle, float dist, float delta_angle);
+
   // Observe new odometry-reported location.
   void ObserveOdometry(const Eigen::Vector2f& odom_loc,
                        const float odom_angle);
@@ -52,12 +81,86 @@ class SLAM {
   // Get latest robot pose.
   void GetPose(Eigen::Vector2f* loc, float* angle) const;
 
+  // Successive Scan Matching Method (Refrence: Olson, 2009)
+  Particle CorrelativeScanMatching(const Observation &new_laser_scan);
+
+  // Parse the laser scan to a smaller number of ranges
+  Observation parse_laser_scan(const Observation &laser_scan);
+
+  // Convert Laser Scan to Point Cloud
+  std::vector<Eigen::Vector2f> to_point_cloud(const Observation &laser_scan);
+
+  // Transform Point Cloud to Baselink
+  void TF_to_robot_baselink(Observation &laser_scan);
+
+  // Transform Point Cloud to Last Pose
+  Eigen::Vector2f TF_cloud_to_last_pose(const Eigen::Vector2f cur_points, const Particle &particle);
+
+  // Combine the Map
+  void CombineMap(const Particle pose);
+
+  std::vector<float> TrimRanges(const std::vector<float> &ranges, const float range_min, const float range_max);
+
+  void InitializeLookupTable();
+  
+  void ApplyGuassianBlur(const Eigen::Vector2f point);
+
+  Eigen::Vector2f GetCellIndex(const Eigen::Vector2f loc);
+
+  bool InCellBounds(int x, int y);
+
+  void ResetLookupTable();
+
  private:
 
   // Previous odometry-reported locations.
   Eigen::Vector2f prev_odom_loc_;
   float prev_odom_angle_;
   bool odom_initialized_;
+
+  // Random number generator.
+  util_random::Random rng_;
+
+  // tunable parameters: CSM
+  float max_particle_cost_;
+  float observation_weight_;
+  float motion_model_weight_;
+
+  // Standard deviation of Physical LIDAR System; set_parameter
+  double ray_std_dev_;
+
+  // tunable parameters: MotionModel
+  float a1_; 
+  float a2_; 
+  float a3_;;
+  float a4_;
+
+  float num_x_;
+  float num_y_;
+  float num_angle_;
+
+  // tunable parameters: ObserveOdometry
+  float min_dist_between_CSM_;
+  float min_angle_between_CSM_;
+
+  int num_ranges_to_skip_;
+
+  std::vector<Eigen::Vector2f> last_point_cloud_;
+  std::vector<Eigen::Vector2f> initial_point_cloud_;
+
+  bool update_scan_;
+  bool first_scan_;
+  bool table_check_;
+  bool map_combined_;
+
+  Eigen::Rotation2Df R_odom_to_mle;
+
+  std::vector<Eigen::Vector2f> map;
+  std::vector<Eigen::Vector2f> last_map;
+
+  std::vector<float> inner_vec;
+
+  std::vector<std::vector<float>>cell;
 };
 }  // namespace slam
 

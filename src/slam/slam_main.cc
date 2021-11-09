@@ -141,7 +141,6 @@ void OdometryCallback(const nav_msgs::Odometry& msg) {
   slam_.ObserveOdometry(odom_loc, odom_angle);
 }
 
-
 int main(int argc, char** argv) {
   google::ParseCommandLineFlags(&argc, &argv, false);
   // Initialize ROS.
