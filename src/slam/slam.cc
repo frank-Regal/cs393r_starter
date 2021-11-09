@@ -249,14 +249,10 @@ std::vector<Eigen::Vector2f> SLAM::to_point_cloud(const Observation &laser_scan)
 
   for (int i {0}; i < num_ranges; i++)
   {
-    if(laser_scan.ranges[i] == 0){
-      continue;
-    }else{
-      point.x() = laser_scan.ranges[i] * cos(angle);
-      point.y() = laser_scan.ranges[i] * sin(angle);
-      point_cloud_out.push_back(point);
-      angle += angle_spacing;
-    }
+    point.x() = laser_scan.ranges[i] * cos(angle);
+    point.y() = laser_scan.ranges[i] * sin(angle);
+    point_cloud_out.push_back(point);
+    angle += angle_spacing;
   }
 
   return point_cloud_out;
@@ -407,7 +403,6 @@ void SLAM::MotionModel(Eigen::Vector2f loc, float angle, float dist, float delta
 Particle SLAM::CorrelativeScanMatching(const Observation &new_laser_scan) 
 { // Match up Laser Scans and Return the most likely estimated pose (mle_pose_)
   //return mle_pose_;
-  std::cout << "CSM **********" << std::endl;
   max_particle_cost_ = -50000000;
   Particle csm_pose = {{0,0},0,0};
 
