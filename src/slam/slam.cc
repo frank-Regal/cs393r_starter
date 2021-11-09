@@ -67,7 +67,7 @@ SLAM::SLAM() :
   max_particle_cost_(0),
   observation_weight_(4),
   motion_model_weight_(1),
-  ray_std_dev_(0.01),
+  ray_std_dev_(0.1),
 
   // tunable parameters: MotionModel
   a1_(0.2), // trans 
@@ -75,19 +75,17 @@ SLAM::SLAM() :
   a3_(0.4), // angle
   a4_(0.1), // angle   // a's taken from particle_filter.cc
 
-  num_x_(10),     // motion resolution in x
-  num_y_(10),     // motion resolution in y
+  num_x_(12),     // motion resolution in x
+  num_y_(7),     // motion resolution in y
   num_angle_(30),  // motion resolution in angle
 
   // tunable parameters: ObserveOdometry
   min_dist_between_CSM_(0.5),  // meters
-  min_angle_between_CSM_(30*M_PI/180), // radians (30 deg)
+  min_angle_between_CSM_(15*M_PI/180), // radians (30 deg)
 
   // used for parsing point cloud
   num_ranges_to_skip_(25),
-  update_scan_(false),
-  first_scan_(false),
-  table_check_(false)
+  update_scan_(false)
   {
     InitializeLookupTable();
   }
@@ -103,7 +101,6 @@ std::vector<Eigen::Vector2f> SLAM::GetMap() {
   // and their respective scans.
   //if (first_scan_ == true and odom_initialized_ == true)
   //  map.clear();
-  
   return map;
 }
 
@@ -111,11 +108,8 @@ void SLAM::ObserveOdometry(const Vector2f& odom_loc, const float odom_angle) {
   if (!odom_initialized_){
     prev_odom_angle_ = odom_angle;
     prev_odom_loc_ = odom_loc;
-    // mle_pose_ = Particle({Vector2f(0,0),0,0});
     odom_initialized_ = true;
-    update_scan_ = true; // check_ was false worked alittle better with true
-    first_scan_ = true;
-    // std::cout << "not init" << std::endl;
+    update_scan_ = true; // create intial scan for lookup table
     return;
   }
 
@@ -151,7 +145,7 @@ void SLAM::ObserveLaser(const vector<float>& ranges,
   // for SLAM. If decided to add, align it to the scan from the last saved pose,
   // and save both the scan and the optimized pose.
 
-  if (update_scan_ == true or (odom_initialized_ == true and not table_check_))
+  if (update_scan_ == true and odom_initialized_ == true)
   {
     new_scan_.ranges    = ranges; //TrimRanges(ranges,range_min,range_max);
     new_scan_.range_min = range_min;
@@ -161,32 +155,27 @@ void SLAM::ObserveLaser(const vector<float>& ranges,
 
     mle_pose_ = CorrelativeScanMatching(new_scan_);
     CombineMap(mle_pose_);
-    // std::cout << "mle_pose_.x(): " << mle_pose_.loc.x()
-    //           << "; mle_pose_.y(): " << mle_pose_.loc.y()
-    //           << std::endl;
 
     // Calculate the rotation matrix from odom to the most likely estimated pose
     R_odom_to_mle = Eigen::Rotation2Df(mle_pose_.angle - prev_odom_angle_);
 
     ResetLookupTable();
-    // TODO
     TF_to_robot_baselink(new_scan_);
     std::vector<Eigen::Vector2f> tf_point_cloud = to_point_cloud(new_scan_);
     for(auto point : tf_point_cloud){
       ApplyGuassianBlur(point);
     }
-    table_check_ = true;
     update_scan_ = false;
   }
 }
 
 void SLAM::InitializeLookupTable(){
-  table_.start_loc.x() = -8;
-  table_.start_loc.y() = -8;
+  table_.start_loc.x() = -5;
+  table_.start_loc.y() = -5;
   table_.min_cost = -1000; 
-  table_.overall_width = 16;
-  table_.overall_height = 16;
-  table_.cell_resolution = 0.02;
+  table_.overall_width = 10;
+  table_.overall_height = 10;
+  table_.cell_resolution = 0.05;
   table_.cell_width = table_.overall_width/table_.cell_resolution;
   table_.cell_height = table_.overall_height/table_.cell_resolution;
   ResetLookupTable();
@@ -365,10 +354,13 @@ void SLAM::CombineMap(const Particle pose)
 
   for (int i {0}; i < num_ranges; i++)
   {
-    point.x() = pose.loc.x() + new_scan_.ranges[i]*cos(pose.angle + angle);
-    point.y() = pose.loc.y() + new_scan_.ranges[i]*sin(pose.angle + angle);
+    if (i%4 == 0)
+    {
+      point.x() = pose.loc.x() + new_scan_.ranges[i]*cos(pose.angle + angle);
+      point.y() = pose.loc.y() + new_scan_.ranges[i]*sin(pose.angle + angle);
+      map.push_back(point);
+    }
     angle += angle_spacing;
-    map.push_back(point);
   }
 }
 
@@ -407,6 +399,7 @@ void SLAM::MotionModel(Eigen::Vector2f loc, float angle, float dist, float delta
 Particle SLAM::CorrelativeScanMatching(const Observation &new_laser_scan) 
 { // Match up Laser Scans and Return the most likely estimated pose (mle_pose_)
   //return mle_pose_;
+  std::cout << "CSM **********" << std::endl;
   max_particle_cost_ = -50000000;
   Particle csm_pose = {{0,0},0,0};
 
@@ -459,7 +452,7 @@ Particle SLAM::CorrelativeScanMatching(const Observation &new_laser_scan)
       // std::cout << "\n" << max_particle_cost_ << "\n" << std::endl;
     }
   }
-  //last_point_cloud_ = new_point_cloud;
+  //update_scan_=false;
   return csm_pose;
 }
 

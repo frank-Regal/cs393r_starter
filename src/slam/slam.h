@@ -151,6 +151,7 @@ class SLAM {
   bool update_scan_;
   bool first_scan_;
   bool table_check_;
+  bool map_combined_;
 
   Eigen::Rotation2Df R_odom_to_mle;
 
