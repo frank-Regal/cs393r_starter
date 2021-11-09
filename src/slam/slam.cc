@@ -153,7 +153,7 @@ void SLAM::ObserveLaser(const vector<float>& ranges,
 
   if (update_scan_ == true or (odom_initialized_ == true and not table_check_))
   {
-    new_scan_.ranges    = ranges; //TrimRanges(ranges,range_min,range_max);
+    new_scan_.ranges    = TrimRanges(ranges,range_min,range_max);
     new_scan_.range_min = range_min;
     new_scan_.range_max = range_max;
     new_scan_.angle_min = angle_min;
@@ -260,10 +260,14 @@ std::vector<Eigen::Vector2f> SLAM::to_point_cloud(const Observation &laser_scan)
 
   for (int i {0}; i < num_ranges; i++)
   {
-    point.x() = laser_scan.ranges[i] * cos(angle);
-    point.y() = laser_scan.ranges[i] * sin(angle);
-    point_cloud_out.push_back(point);
-    angle += angle_spacing;
+    if(laser_scan.ranges[i] == 0){
+      continue;
+    }else{
+      point.x() = laser_scan.ranges[i] * cos(angle);
+      point.y() = laser_scan.ranges[i] * sin(angle);
+      point_cloud_out.push_back(point);
+      angle += angle_spacing;
+    }
   }
 
   return point_cloud_out;
@@ -278,10 +282,14 @@ void SLAM::TF_to_robot_baselink(Observation &laser_scan) // checked
 
   float angle_iter = laser_scan.angle_min;
   for(int i = 0; i < laser_scan_size; i++){
-    float x = laser_scan.ranges[i]*cos(angle_iter)+0.2;
-    float y = laser_scan.ranges[i]*sin(angle_iter);
-    laser_scan.ranges[i] = sqrt(pow(x,2) + pow(y,2));
-    angle_iter += delta_angle;
+    if(laser_scan.ranges[i] == 0){
+      continue;
+    }else{
+      float x = laser_scan.ranges[i]*cos(angle_iter)+0.2;
+      float y = laser_scan.ranges[i]*sin(angle_iter);
+      laser_scan.ranges[i] = sqrt(pow(x,2) + pow(y,2));
+      angle_iter += delta_angle;
+    }
   }
 
 }
@@ -365,10 +373,13 @@ void SLAM::CombineMap(const Particle pose)
 
   for (int i {0}; i < num_ranges; i++)
   {
+    if (i%4 == 0 and new_scan_.ranges[i] != 0)
+    {
     point.x() = pose.loc.x() + new_scan_.ranges[i]*cos(pose.angle + angle);
     point.y() = pose.loc.y() + new_scan_.ranges[i]*sin(pose.angle + angle);
-    angle += angle_spacing;
     map.push_back(point);
+    }
+    angle += angle_spacing;
   }
 }
 
