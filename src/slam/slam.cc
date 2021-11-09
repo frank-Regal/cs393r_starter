@@ -84,7 +84,7 @@ SLAM::SLAM() :
   min_angle_between_CSM_(30*M_PI/180), // radians (30 deg)
 
   // used for parsing point cloud
-  num_ranges_to_skip_(5),
+  num_ranges_to_skip_(25),
   update_scan_(false),
   first_scan_(false),
   table_check_(false)
@@ -129,7 +129,7 @@ void SLAM::ObserveOdometry(const Vector2f& odom_loc, const float odom_angle) {
   float dist = distance.norm();
 
   // Update the pose called in GetPose() to return to the simulator
-  give_pose_.loc = mle_pose_.loc + R_odom_to_mle*distance;
+  give_pose_.loc = mle_pose_.loc + R_odom_to_mle * distance;
   give_pose_.angle = fmod(mle_pose_.angle + delta_angle + M_PI,2*M_PI) - M_PI;
   
   if(dist > min_dist_between_CSM_ or abs(delta_angle) > min_angle_between_CSM_){
@@ -292,7 +292,7 @@ void SLAM::TF_to_robot_baselink(Observation &laser_scan) // checked
 
   float angle_iter = laser_scan.angle_min;
   for(int i = 0; i < laser_scan_size; i++){
-    float x = laser_scan.ranges[i]*cos(angle_iter)-0.2;
+    float x = laser_scan.ranges[i]*cos(angle_iter)+0.2;
     float y = laser_scan.ranges[i]*sin(angle_iter);
     laser_scan.ranges[i] = sqrt(pow(x,2) + pow(y,2));
     angle_iter += delta_angle;
@@ -421,8 +421,8 @@ void SLAM::MotionModel(Eigen::Vector2f loc, float angle, float dist, float delta
 Particle SLAM::CorrelativeScanMatching(const Observation &new_laser_scan) 
 { // Match up Laser Scans and Return the most likely estimated pose (mle_pose_)
   //return mle_pose_;
-  max_particle_cost_ = 0;
-  mle_pose_ = {{0,0},0,0};
+  max_particle_cost_ = -50000000;
+  Particle csm_pose = {{0,0},0,0};
 
   // parse the incoming laser scan to be more manageable
   Observation parsed_laser_scan = parse_laser_scan(new_laser_scan);
@@ -466,15 +466,15 @@ Particle SLAM::CorrelativeScanMatching(const Observation &new_laser_scan)
                           (particle.weight * motion_model_weight_);
     //std::cout << "particle_pose_cost: " << particle_pose_cost << std::endl;
     // If this particle is a very high probability, set it as the best guess
-    if (particle_pose_cost < max_particle_cost_)
+    if (particle_pose_cost > max_particle_cost_)
     {
-      mle_pose_.loc    = particle.loc;
+      csm_pose.loc = particle.loc;
       max_particle_cost_ = particle_pose_cost;
     }
   }
-  last_point_cloud_ = new_point_cloud;
+  //last_point_cloud_ = new_point_cloud;
   std::cout << "updated last_point_cloud" << std::endl;
-  return mle_pose_;
+  return csm_pose;
 }
 
 
