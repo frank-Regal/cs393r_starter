@@ -32,6 +32,7 @@
 #include "shared/ros/ros_helpers.h"
 #include "navigation.h"
 #include "visualization/visualization.h"
+#include "rrt_graph.h"
 
 using Eigen::Vector2f;
 using amrl_msgs::AckermannCurvatureDriveMsg;
@@ -52,6 +53,8 @@ AckermannCurvatureDriveMsg drive_msg_;
 const float kEpsilon = 1e-5;
 } //namespace
 
+
+
 namespace navigation {
 
 Navigation::Navigation(const string& map_file, ros::NodeHandle* n) :
@@ -63,7 +66,9 @@ Navigation::Navigation(const string& map_file, ros::NodeHandle* n) :
     robot_omega_(0),
     nav_complete_(true),
     nav_goal_loc_(0, 0),
-    nav_goal_angle_(0) {
+    nav_goal_angle_(0),
+    graph_()
+ {
   drive_pub_ = n->advertise<AckermannCurvatureDriveMsg>(
       "ackermann_curvature_drive", 1);
   viz_pub_ = n->advertise<VisualizationMsg>("visualization", 1);
@@ -123,7 +128,9 @@ void Navigation::Run() {
 
   // Eventually, you will have to set the control values to issue drive commands:
   // drive_msg_.curvature = ...;
-  drive_msg_.velocity = 1;
+  drive_msg_.velocity = 0.9;
+
+  graph_.TestFunc(); //testing 1 2
 
   // Add timestamps to all messages.
   local_viz_msg_.header.stamp = ros::Time::now();
@@ -135,4 +142,27 @@ void Navigation::Run() {
   drive_pub_.publish(drive_msg_);
 }
 
+void Navigation::BuildRRT(const Eigen::Vector2f q_init, const int k, const float delta_q)
+{ // Rapidly Exploring Random Tree
+  // Input Definitions:
+  // - q_init = intial configuration
+  // - k = number of vertices
+  // - delta_q = incremental distance
+  Eigen::Vector2f q_rand (0,0);  // random node within the c-space
+  Eigen::Vector2f q_near (0,0);  // nears node
+  Eigen::Vector2f q_new (0,0);   // holder for new node
+  Eigen::Vector2f C (16.0,16.0); // c-space / exploration space
+
+  graph_.SetInitNode(q_init); // initialize the starting point of rrt
+
+  for (int i{0}; i < k; i++)
+  {
+    q_rand = graph_.GetRandq(C.x(), C.y()); // get a random node
+    q_near = graph_.GetClosestq(q_rand);    // get the closest node to the random node
+    q_new = graph_.GetNewq(q_near, q_rand, delta_q);
+    graph_.AddVertex(q_new);
+    graph_.AddEdge(q_near,q_new);
+  }
+
+}
 }  // namespace navigation

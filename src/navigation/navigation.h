@@ -22,6 +22,7 @@
 #include <vector>
 
 #include "eigen3/Eigen/Dense"
+#include "rrt_graph.h"
 
 #ifndef NAVIGATION_H
 #define NAVIGATION_H
@@ -40,6 +41,12 @@ struct PathOption {
   Eigen::Vector2f closest_point;
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
 };
+
+struct Pose {
+  Eigen::Vector2f loc;
+  float angle;
+};
+
 
 class Navigation {
  public:
@@ -96,6 +103,14 @@ class Navigation {
   Eigen::Vector2f nav_goal_loc_;
   // Navigation goal angle.
   float nav_goal_angle_;
+
+  // Added the following for RRT
+  void BuildRRT(const Eigen::Vector2f q_init, const int k, const float delta_q);
+
+  std::vector<Eigen::Vector2f> graph;
+
+  RRTGraph graph_;
+
 };
 
 }  // namespace navigation
