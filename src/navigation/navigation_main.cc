@@ -138,6 +138,7 @@ int main(int argc, char** argv) {
   ros::init(argc, argv, "navigation", ros::init_options::NoSigintHandler);
   ros::NodeHandle n;
   navigation_ = new Navigation(FLAGS_map, &n);
+  navigation_->InitMap(FLAGS_map);
 
   ros::Subscriber velocity_sub =
       n.subscribe(FLAGS_odom_topic, 1, &OdometryCallback);

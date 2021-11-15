@@ -22,7 +22,11 @@
 #include <vector>
 
 #include "eigen3/Eigen/Dense"
+#include "vector_map/vector_map.h"
 #include "rrt_graph.h"
+using std::string;
+using geometry::line2f;
+using vector_map::VectorMap;
 
 #ifndef NAVIGATION_H
 #define NAVIGATION_H
@@ -72,6 +76,10 @@ class Navigation {
   // Used to set the next target pose.
   void SetNavGoal(const Eigen::Vector2f& loc, float angle);
 
+
+  // **** Added for RRT
+  void InitMap(const string& map_file);
+
  private:
 
   // Whether odometry has been initialized.
@@ -107,9 +115,16 @@ class Navigation {
   // Added the following for RRT
   void BuildRRT(const Eigen::Vector2f q_init, const int k, const float delta_q);
 
+  Eigen::Vector2f FindIntersection(const Eigen::Vector2f A, const Eigen::Vector2f B);
+
   std::vector<Eigen::Vector2f> graph;
 
   RRTGraph graph_;
+
+  // Map of the environment.
+  vector_map::VectorMap map_;
+
+  
 
 };
 

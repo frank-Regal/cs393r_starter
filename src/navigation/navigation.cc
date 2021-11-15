@@ -33,12 +33,16 @@
 #include "navigation.h"
 #include "visualization/visualization.h"
 #include "rrt_graph.h"
+#include "shared/math/line2d.h"
+#include "vector_map/vector_map.h"
 
 using Eigen::Vector2f;
 using amrl_msgs::AckermannCurvatureDriveMsg;
 using amrl_msgs::VisualizationMsg;
 using std::string;
 using std::vector;
+using geometry::line2f;
+using vector_map::VectorMap;
 
 using namespace math_util;
 using namespace ros_helpers;
@@ -131,7 +135,9 @@ void Navigation::Run() {
   drive_msg_.velocity = 0.9;
 
   Eigen::Vector2f random_num = graph_.GetRandq(20,20); //testing 1 2
-  random_num = random_num;
+  std::cout << "random_num: " << random_num << std::endl;
+  Eigen::Vector2f closest_point = graph_.GetClosestq(random_num);
+  std::cout << "closest_point: " << closest_point << "\n" << std::endl;
 
   // Add timestamps to all messages.
   local_viz_msg_.header.stamp = ros::Time::now();
@@ -143,6 +149,42 @@ void Navigation::Run() {
   drive_pub_.publish(drive_msg_);
 }
 
+void Navigation::InitMap(const string& map_file)
+{ // Load Map File. Called in navigation_main.cc
+  map_.Load(map_file);
+  std::cout << "Initialized: " << map_file << std::endl;
+}
+
+Eigen::Vector2f Navigation::FindIntersection(const Eigen::Vector2f q_near, const Eigen::Vector2f q_new_cur)
+{ // Set a new node if the map intersects
+
+  line2f q_line (q_near.x(),q_near.y(), q_new_cur.x(), q_new_cur.y());
+  Eigen::Vector2f output_q = q_new_cur;
+
+  Eigen::Vector2f delta_q (0,0);
+  Eigen::Vector2f closest_q (0,0);
+  float magnitude {0};
+  float min_dist {500000};  //potential bug
+
+
+  for (size_t i {0}; i < map_.lines.size(); ++i){
+
+    const line2f map_line = map_.lines[i];
+    bool intersects = map_line.Intersection(q_line, &closest_q);
+    
+    if (intersects == true){
+      delta_q = q_near - closest_q;
+      magnitude = delta_q.norm();
+      if (magnitude < min_dist){
+        output_q = closest_q;
+        min_dist = magnitude;
+      }
+    }
+  }
+
+  return output_q;
+}
+
 void Navigation::BuildRRT(const Eigen::Vector2f q_init, const int k, const float delta_q)
 { // Rapidly Exploring Random Tree
   // Input Definitions:
@@ -151,16 +193,18 @@ void Navigation::BuildRRT(const Eigen::Vector2f q_init, const int k, const float
   // - delta_q = incremental distance
   Eigen::Vector2f q_rand (0,0);  // random node within the c-space
   Eigen::Vector2f q_near (0,0);  // nears node
-  Eigen::Vector2f q_new (0,0);   // holder for new node
-  Eigen::Vector2f C (16.0,16.0); // c-space / exploration space
+  Eigen::Vector2f q_trim (0,0);   // holder for new node
+  Eigen::Vector2f q_new  (0,0);   // holder for new node
+  Eigen::Vector2f C (20.0,20.0); // c-space / exploration space
 
   graph_.SetInitNode(q_init); // initialize the starting point of rrt
 
   for (int i{0}; i < k; i++)
   {
-    q_rand = graph_.GetRandq(C.x(), C.y());     // get a random node
-    q_near = graph_.GetClosestq(q_rand);        // get the closest node to the random node
-    q_new = graph_.GetNewq(q_near, q_rand, delta_q);
+    q_rand = graph_.GetRandq(C.x(), C.y());           // get a random node
+    q_near = graph_.GetClosestq(q_rand);              // get the closest node to the random node
+    q_trim = graph_.GetNewq(q_near, q_rand, delta_q); // get a new q based on the max distance TODO: Need to add wall checking
+    q_new  = FindIntersection(q_near, q_trim);        // determine if the map intersects with the new node
     graph_.AddVertex(q_new);
     graph_.AddEdge(q_near,q_new);
   }
