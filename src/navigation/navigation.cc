@@ -130,7 +130,8 @@ void Navigation::Run() {
   // drive_msg_.curvature = ...;
   drive_msg_.velocity = 0.9;
 
-  graph_.TestFunc(); //testing 1 2
+  Eigen::Vector2f random_num = graph_.GetRandq(20,20); //testing 1 2
+  random_num = random_num;
 
   // Add timestamps to all messages.
   local_viz_msg_.header.stamp = ros::Time::now();
@@ -157,8 +158,8 @@ void Navigation::BuildRRT(const Eigen::Vector2f q_init, const int k, const float
 
   for (int i{0}; i < k; i++)
   {
-    q_rand = graph_.GetRandq(C.x(), C.y()); // get a random node
-    q_near = graph_.GetClosestq(q_rand);    // get the closest node to the random node
+    q_rand = graph_.GetRandq(C.x(), C.y());     // get a random node
+    q_near = graph_.GetClosestq(q_rand);        // get the closest node to the random node
     q_new = graph_.GetNewq(q_near, q_rand, delta_q);
     graph_.AddVertex(q_new);
     graph_.AddEdge(q_near,q_new);
