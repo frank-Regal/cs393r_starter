@@ -13,13 +13,15 @@
 //  If not, see <http://www.gnu.org/licenses/>.
 //========================================================================
 /*!
-\file           particle-filter.h
-\brief          Particle Filter Interface
+\file    particle-filter.h
+\brief   Particle Filter Interface
 \university:    The University of Texas at Austin
 \class:         CS 393r Autonomous Robots
 \assignment:    Assignment 2 - Particle Filter
 \author:        Mary Tebben & Frank Regal
 \adopted from:  Dr. Joydeep Biswas
+//
+// Original Author of particle filter: Team Ka-Chow
 */
 //========================================================================
 
@@ -31,6 +33,7 @@
 #include "shared/math/line2d.h"
 #include "shared/util/random.h"
 #include "vector_map/vector_map.h"
+#include "visualization/visualization.h"
 
 #ifndef SRC_PARTICLE_FILTER_H_
 #define SRC_PARTICLE_FILTER_H_
@@ -42,7 +45,6 @@ struct Particle {
   float angle;
   double weight;
 };
-
 
 class ParticleFilter {
  public:
@@ -57,7 +59,8 @@ class ParticleFilter {
                     float angle_max);
 
   // Predict particle motion based on odometry.
-  void Predict(const Eigen::Vector2f &odom_cur_pos, const float &odom_cur_angle);
+  void Predict(const Eigen::Vector2f& odom_loc,
+                       const float odom_angle);
 
   // Initialize the robot location.
   void Initialize(const std::string& map_file,
@@ -81,6 +84,12 @@ class ParticleFilter {
   // Resample particles.
   void Resample();
 
+  void LowVarianceResample();
+
+  void SortMap();
+  static bool horizontal_line_compare(const geometry::line2f l1, const geometry::line2f l2);
+  static bool vertical_line_compare(const geometry::line2f l1, const geometry::line2f l2);
+
   // For debugging: get predicted point cloud from current location.
   void GetPredictedPointCloud(const Eigen::Vector2f& loc,
                               const float angle,
@@ -91,8 +100,10 @@ class ParticleFilter {
                               float angle_max,
                               std::vector<Eigen::Vector2f>* scan);
 
- double get_angle_diff(double a, double b);
-  
+  void SetParticlesForTesting(std::vector<Particle> new_particles);
+
+ Eigen::Vector2f BaseLinkToSensorFrame(const Eigen::Vector2f &loc, const float &angle);
+
  private:
 
   // List of particles being tracked.
@@ -100,17 +111,28 @@ class ParticleFilter {
 
   // Map of the environment.
   vector_map::VectorMap map_;
+  std::vector<geometry::line2f> horizontal_lines_;
+  std::vector<geometry::line2f> vertical_lines_;
+  std::vector<geometry::line2f> angled_lines_;
 
   // Random number generator.
   util_random::Random rng_;
 
   // Previous odometry-reported locations.
-  Eigen::Vector2f odom_old_pos;
-  float odom_old_angle;
+  Eigen::Vector2f prev_odom_loc_;
+  float prev_odom_angle_;
   bool odom_initialized_;
-  bool predict_step_done_;
 
+  // Eigen::Vector2f first_odom_loc;
+  // float first_odom_angle;
+  // bool first_odom_flag = true;
+  
+  std::vector<double> weight_bins_;
+  double max_weight_log_ = 0;
+  double weight_sum_ = 0;
 
+  Eigen::Vector2f last_update_loc_;
+  int resample_loop_counter_ = 0;
 };
 }  // namespace slam
 
