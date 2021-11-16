@@ -194,6 +194,7 @@ Eigen::Vector2f Navigation::FindIntersection(const Eigen::Vector2f q_near, const
 
 void Navigation::BuildRRT(const Eigen::Vector2f q_init, const int k, const float delta_q)
 { // Rapidly Exploring Random Tree
+  
   // Input Definitions:
   // - q_init = intial configuration
   // - k = number of vertices
@@ -204,17 +205,30 @@ void Navigation::BuildRRT(const Eigen::Vector2f q_init, const int k, const float
   Eigen::Vector2f q_trim (0,0);  // holder for new node
   Eigen::Vector2f q_new  (0,0);  // holder for new node
   Eigen::Vector2f C (20.0,20.0); // c-space / exploration space
+  Eigen::Vector2f q_goal (0,0);  // TODO change to Set_Nav_Goal Variables 
+  float goal_threshold = 0.5;    // meters
+  bool goal_reached = false;     // check if robot is at goal yet
 
   tree_.SetInitNode(q_init); // initialize the starting point of rrt
 
-  for (int i{0}; i < k; i++)
+  while(goal_reached == false)
   {
-    q_rand = tree_.GetRandq(C.x(), C.y());           // get a random node
-    q_near = tree_.GetClosestq(q_rand);              // get the closest node to the random node
-    q_trim = tree_.GetNewq(q_near, q_rand, delta_q); // get a new q based on the max distance TODO: Need to add wall checking
+    q_rand = tree_.GetRandq(C.x(), C.y());            // get a random node
+    q_near = tree_.GetClosestq(q_rand);               // get the closest node to the random node
+    q_trim = tree_.GetNewq(q_near, q_rand, delta_q);  // get a new q based on the max distance TODO: Need to add wall checking
     q_new  = FindIntersection(q_near, q_trim);        // determine if the map intersects with the new node
-    tree_.AddVertex(q_new);
-    tree_.AddEdge(q_near,q_new);
+
+    goal_reached = tree_.IsNearGoal(q_new, q_goal,goal_threshold);  // is the node within the threshold of the goal
+
+    if (goal_reached == true){
+      std::cout << "path found" << std::endl;
+      tree_.FindShortestPath(q_near, q_new);
+    } else {
+      tree_.AddVertex(q_new);
+      tree_.AddEdge(q_near,q_new);
+    }
+
+    
   }
 
 }

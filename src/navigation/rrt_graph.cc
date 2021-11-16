@@ -4,6 +4,8 @@
 #include "shared/math/geometry.h"
 #include "rrt_graph.h"
 #include <iostream>
+#include <utility>
+#include <deque>
 
 using Eigen::Vector2f;
 using std::string;
@@ -15,11 +17,16 @@ RRTGraph::RRTGraph():
 
 }
 
+void RRTGraph::ClearTree()
+{
+    tree_vertex.clear();
+    tree_edge.clear();
+}
+
 void RRTGraph::SetInitNode(const Eigen::Vector2f& node)
 {
-    tree.clear();     // clear out previous tree 
     init_node << node;
-    tree.push_back(init_node);
+    tree_vertex.push_back(init_node);
 }
 
 Eigen::Vector2f RRTGraph::GetInitNode()
@@ -29,12 +36,15 @@ Eigen::Vector2f RRTGraph::GetInitNode()
 
 void RRTGraph::AddVertex(Eigen::Vector2f q_new)
 {
-    tree.push_back(q_new);
+    tree_vertex.push_back(q_new);
 }
 
 void RRTGraph::AddEdge(Eigen::Vector2f q_near, Eigen::Vector2f q_new)
 {
-    std::cout << "TODO: Add Edge" <<std::endl;
+    std::vector<Eigen::Vector2f> tree_pair;
+    tree_pair.push_back(q_near);
+    tree_pair.push_back(q_new);
+    tree_edge.push_back(tree_pair);
 }
 
 Eigen::Vector2f RRTGraph::GetRandq(float Cx, float Cy)
@@ -52,12 +62,12 @@ Eigen::Vector2f RRTGraph::GetClosestq(const Eigen::Vector2f q_rand)
     float min_dist {500000};  //potential bug
 
     //TEST
-    tree.push_back(Eigen::Vector2f(14,10));
-    tree.push_back(Eigen::Vector2f(-12,4));
-    tree.push_back(Eigen::Vector2f(-5,-11.21));
-    tree.push_back(Eigen::Vector2f(2.23,16.7));
+    tree_vertex.push_back(Eigen::Vector2f(14,10));
+    tree_vertex.push_back(Eigen::Vector2f(-12,4));
+    tree_vertex.push_back(Eigen::Vector2f(-5,-11.21));
+    tree_vertex.push_back(Eigen::Vector2f(2.23,16.7));
 
-    for (auto& q:tree){
+    for (auto& q:tree_vertex){
         delta_q = q_rand - q;
         magnitude = delta_q.norm();
         if (magnitude < min_dist){
@@ -86,6 +96,35 @@ Eigen::Vector2f RRTGraph::GetNewq(const Eigen::Vector2f q_near, const Eigen::Vec
     }
 
     return q;
+}
+
+bool RRTGraph::IsNearGoal(const Eigen::Vector2f q, const Eigen::Vector2f q_goal, const float threshold)
+{
+    bool is_close = false;
+    Eigen::Vector2f delta_q = q_goal - q;
+    float magnitude = delta_q.norm();
+    if (magnitude < threshold)
+        is_close = true;
+
+    return is_close; 
+}
+
+void RRTGraph::FindShortestPath(const Eigen::Vector2f q_near, const Eigen::Vector2f q_new)
+{
+    int tree_length = tree_edge.size();
+    Eigen::Vector2f point_buff = q_near;
+
+    for (int i {tree_length}; i > 0; i--){
+
+        if (tree_edge[i][1] == point_buff){
+
+            if (tree_edge[i][0] == init_node){
+                path_to_goal.push_front(tree_edge[i][0]);
+            }
+
+        }
+        
+    }
 }
 
 void RRTGraph::TestFunc()
