@@ -45,6 +45,7 @@
 #include "shared/math/math_util.h"
 #include "shared/util/timer.h"
 #include "shared/ros/ros_helpers.h"
+#include "visualization/visualization.h"
 
 #include "navigation.h"
 

@@ -28,6 +28,7 @@
 #include "glog/logging.h"
 #include "ros/ros.h"
 #include "shared/math/math_util.h"
+#include "shared/math/geometry.h"
 #include "shared/util/timer.h"
 #include "shared/ros/ros_helpers.h"
 #include "navigation.h"
@@ -71,7 +72,7 @@ Navigation::Navigation(const string& map_file, ros::NodeHandle* n) :
     nav_complete_(true),
     nav_goal_loc_(0, 0),
     nav_goal_angle_(0),
-    graph_()
+    tree_()
  {
   drive_pub_ = n->advertise<AckermannCurvatureDriveMsg>(
       "ackermann_curvature_drive", 1);
@@ -134,10 +135,12 @@ void Navigation::Run() {
   // drive_msg_.curvature = ...;
   drive_msg_.velocity = 0.9;
 
-  Eigen::Vector2f random_num = graph_.GetRandq(20,20); //testing 1 2
+  Eigen::Vector2f random_num = tree_.GetRandq(20,20); //testing 1 2
   std::cout << "random_num: " << random_num << std::endl;
-  Eigen::Vector2f closest_point = graph_.GetClosestq(random_num);
+  Eigen::Vector2f closest_point = tree_.GetClosestq(random_num);
   std::cout << "closest_point: " << closest_point << "\n" << std::endl;
+  float ang = geometry::Angle(closest_point);
+  std::cout << "angle: " << ang << std::endl;
 
   // Add timestamps to all messages.
   local_viz_msg_.header.stamp = ros::Time::now();
@@ -148,6 +151,8 @@ void Navigation::Run() {
   viz_pub_.publish(global_viz_msg_);
   drive_pub_.publish(drive_msg_);
 }
+
+// Added the Following for RRT
 
 void Navigation::InitMap(const string& map_file)
 { // Load Map File. Called in navigation_main.cc
@@ -175,6 +180,8 @@ Eigen::Vector2f Navigation::FindIntersection(const Eigen::Vector2f q_near, const
     if (intersects == true){
       delta_q = q_near - closest_q;
       magnitude = delta_q.norm();
+
+      // find the shortest intersecting line
       if (magnitude < min_dist){
         output_q = closest_q;
         min_dist = magnitude;
@@ -191,22 +198,23 @@ void Navigation::BuildRRT(const Eigen::Vector2f q_init, const int k, const float
   // - q_init = intial configuration
   // - k = number of vertices
   // - delta_q = incremental distance
+
   Eigen::Vector2f q_rand (0,0);  // random node within the c-space
   Eigen::Vector2f q_near (0,0);  // nears node
-  Eigen::Vector2f q_trim (0,0);   // holder for new node
-  Eigen::Vector2f q_new  (0,0);   // holder for new node
+  Eigen::Vector2f q_trim (0,0);  // holder for new node
+  Eigen::Vector2f q_new  (0,0);  // holder for new node
   Eigen::Vector2f C (20.0,20.0); // c-space / exploration space
 
-  graph_.SetInitNode(q_init); // initialize the starting point of rrt
+  tree_.SetInitNode(q_init); // initialize the starting point of rrt
 
   for (int i{0}; i < k; i++)
   {
-    q_rand = graph_.GetRandq(C.x(), C.y());           // get a random node
-    q_near = graph_.GetClosestq(q_rand);              // get the closest node to the random node
-    q_trim = graph_.GetNewq(q_near, q_rand, delta_q); // get a new q based on the max distance TODO: Need to add wall checking
+    q_rand = tree_.GetRandq(C.x(), C.y());           // get a random node
+    q_near = tree_.GetClosestq(q_rand);              // get the closest node to the random node
+    q_trim = tree_.GetNewq(q_near, q_rand, delta_q); // get a new q based on the max distance TODO: Need to add wall checking
     q_new  = FindIntersection(q_near, q_trim);        // determine if the map intersects with the new node
-    graph_.AddVertex(q_new);
-    graph_.AddEdge(q_near,q_new);
+    tree_.AddVertex(q_new);
+    tree_.AddEdge(q_near,q_new);
   }
 
 }

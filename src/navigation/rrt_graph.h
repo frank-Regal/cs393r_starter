@@ -10,7 +10,7 @@
 class RRTGraph
 {
 private:
-    std::vector<Eigen::Vector2f> graph;
+    std::vector<Eigen::Vector2f> tree;
     Eigen::Vector2f init_node;
     util_random::Random rng_;
     Eigen::Vector2f random;
@@ -31,7 +31,7 @@ Eigen::Vector2f GetRandq(const float Cx, const float Cy);
 
 Eigen::Vector2f GetClosestq(const Eigen::Vector2f q_rand);
 
-Eigen::Vector2f GetNewq(const Eigen::Vector2f q_near, const Eigen::Vector2f q_rand, const float delta_q);
+Eigen::Vector2f GetNewq(const Eigen::Vector2f q_near, const Eigen::Vector2f q_rand, const float Max_delta_q);
 
 void TestFunc();
 
