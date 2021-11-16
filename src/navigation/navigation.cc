@@ -44,6 +44,10 @@ using std::string;
 using std::vector;
 using geometry::line2f;
 using vector_map::VectorMap;
+using visualization::DrawArc;
+using visualization::DrawPoint;
+using visualization::DrawLine;
+using visualization::DrawParticle;
 
 using namespace math_util;
 using namespace ros_helpers;
@@ -139,8 +143,10 @@ void Navigation::Run() {
   std::cout << "random_num: " << random_num << std::endl;
   Eigen::Vector2f closest_point = tree_.GetClosestq(random_num);
   std::cout << "closest_point: " << closest_point << "\n" << std::endl;
-  float ang = geometry::Angle(closest_point);
-  std::cout << "angle: " << ang << std::endl;
+  //float ang = geometry::Angle(closest_point);
+  //std::cout << "angle: " << ang << std::endl;
+  const uint32_t color = 0x89cdc9;
+  DrawPoint(Eigen::Vector2f(10,10), color, local_viz_msg_);
 
   // Add timestamps to all messages.
   local_viz_msg_.header.stamp = ros::Time::now();
@@ -198,6 +204,8 @@ void Navigation::BuildRRT(const Eigen::Vector2f q_init, const int k, const float
   // - q_init = intial configuration
   // - k = number of vertices
   // - delta_q = incremental distance
+  const uint32_t color = 0x89cdc9;
+  const uint32_t color2 = 0x89c9d7;
 
   Eigen::Vector2f q_rand (0,0);  // random node within the c-space
   Eigen::Vector2f q_near (0,0);  // nears node
@@ -215,7 +223,8 @@ void Navigation::BuildRRT(const Eigen::Vector2f q_init, const int k, const float
     q_new  = FindIntersection(q_near, q_trim);        // determine if the map intersects with the new node
     tree_.AddVertex(q_new);
     tree_.AddEdge(q_near,q_new);
+    visualization::DrawPoint(q_new, color, local_viz_msg_);
+    visualization::DrawLine(q_near, q_new, color2, global_viz_msg_);
   }
-
 }
 }  // namespace navigation

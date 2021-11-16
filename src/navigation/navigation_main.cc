@@ -61,6 +61,10 @@ using ros_helpers::SetRosVector;
 using std::string;
 using std::vector;
 using Eigen::Vector2f;
+using visualization::DrawArc;
+using visualization::DrawPoint;
+using visualization::DrawLine;
+using visualization::DrawParticle;
 
 // Create command line arguments
 DEFINE_string(laser_topic, "scan", "Name of ROS topic for LIDAR data");
