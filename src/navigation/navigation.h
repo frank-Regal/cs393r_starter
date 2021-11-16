@@ -117,15 +117,10 @@ class Navigation {
 
   Eigen::Vector2f FindIntersection(const Eigen::Vector2f A, const Eigen::Vector2f B);
 
-  std::vector<Eigen::Vector2f> tree;
-
   RRTGraph tree_;
 
   // Map of the environment.
   vector_map::VectorMap map_;
-
-  
-
 };
 
 }  // namespace navigation
