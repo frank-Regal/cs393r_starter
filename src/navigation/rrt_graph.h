@@ -40,7 +40,7 @@ Eigen::Vector2f GetNewq(const Eigen::Vector2f q_near, const Eigen::Vector2f q_ra
 
 bool IsNearGoal(const Eigen::Vector2f q, const Eigen::Vector2f q_goal, const float threshold);
 
-void FindShortestPath(const Eigen::Vector2f q_near, const Eigen::Vector2f q_new);
+void FindPathBack(const Eigen::Vector2f q_near, const Eigen::Vector2f q_new);
 
 void ClearTree();
 
@@ -49,6 +49,8 @@ void TestFunc();
 std::vector<Eigen::Vector2f> GetVertices();
 
 std::vector<std::vector<Eigen::Vector2f>> GetEdges();
+
+std::deque<Eigen::Vector2f> GetPathBack();
 
 };
 

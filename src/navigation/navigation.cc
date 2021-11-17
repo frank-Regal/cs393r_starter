@@ -221,7 +221,7 @@ void Navigation::BuildRRT(const Eigen::Vector2f q_init, const Eigen::Vector2f q_
   Eigen::Vector2f C (abs(q_init.x())+mag_w_buff, abs(q_init.y())+mag_w_buff); // c-space / exploration space
 
   const float delta_q = 0.2;     // max distance for rrt
-  float goal_threshold = 0.2;    // meters
+  float goal_threshold = 0.3;    // meters
   Eigen::Vector2f q_rand (0,0);  // random node within the c-space
   Eigen::Vector2f q_near (0,0);  // nears node
   Eigen::Vector2f q_trim (0,0);  // holder for new node
@@ -234,20 +234,22 @@ void Navigation::BuildRRT(const Eigen::Vector2f q_init, const Eigen::Vector2f q_
   {
     q_rand = tree_.GetRandq(C.x(), C.y());            // get a random node
     q_near = tree_.GetClosestq(q_rand);               // get the closest node to the random node
-    q_trim = tree_.GetNewq(q_near, q_rand, delta_q);  // get a new q based on the max distance TODO: Need to add wall checking
-    //q_trim_.push_back(q_trim);                        // trim the straight line path to max predefined distance
+    q_trim = tree_.GetNewq(q_near, q_rand, delta_q);  // get a new q based on the max distance    
     q_new  = FindIntersection(q_near, q_trim);        // determine if the map intersects with the new node
-    //q_new_.push_back(q_new);
     goal_reached = tree_.IsNearGoal(q_new, q_goal,goal_threshold);  // is the node within the threshold of the goal
 
     if (goal_reached == true){
       std::cout << "path found!" << std::endl;
-      //tree_.FindShortestPath(q_near, q_new);
+      tree_.FindPathBack(q_near,q_new);
     } else {
       tree_.AddVertex(q_new);
       tree_.AddEdge(q_near,q_new);
     }
-
+  } 
+  
+  for (auto& f:tree_.GetPathBack()){
+    std::cout << "x: " << f.x() 
+              << "; y: " << f.y() << std::endl;
   }
 
   std::cout << "Done." << std::endl;
@@ -255,18 +257,30 @@ void Navigation::BuildRRT(const Eigen::Vector2f q_init, const Eigen::Vector2f q_
 
 void Navigation::Vizualize()
 {
-  //const uint32_t color1 = 0xfc0303;
-  const uint32_t color2 = 0xe303fc;
+  const uint32_t magenta = 0xe303fc;
+  const uint32_t black = 0x000000;
+  const uint32_t green = 0x034f00;
 
   for (auto& p:tree_.GetVertices()){
-    DrawPoint(p, color2, global_viz_msg_);
+    DrawPoint(p, magenta, global_viz_msg_);
   }
 
   for (auto& l:tree_.GetEdges()){
-    DrawLine(l[0],l[1],color2,global_viz_msg_);
+    DrawLine(l[0],l[1],magenta,global_viz_msg_);
+  }
+  
+  int i = 0;
+  Eigen::Vector2f buff;
+  for (auto& f:tree_.GetPathBack()){
+    DrawPoint(f,black,global_viz_msg_);
+    if (i != 0){
+      DrawLine(buff, f, black, global_viz_msg_);
+    }
+    buff = f;
+    i++;
   }
 
-  DrawCross(nav_goal_,0.2,0x034f00,global_viz_msg_);
+  DrawCross(nav_goal_,0.2,green,global_viz_msg_);
 
 }
 
