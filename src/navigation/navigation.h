@@ -78,7 +78,13 @@ class Navigation {
 
 
   // **** Added for RRT
+
+  // Added the following for RRT
+  void BuildRRT(const Eigen::Vector2f q_init, const Eigen::Vector2f q_goal);
+  
   void InitMap(const string& map_file);
+
+  void Vizualize();
 
  private:
 
@@ -111,9 +117,6 @@ class Navigation {
   Eigen::Vector2f nav_goal_loc_;
   // Navigation goal angle.
   float nav_goal_angle_;
-
-  // Added the following for RRT
-  void BuildRRT(const Eigen::Vector2f q_init, const int k, const float delta_q);
 
   Eigen::Vector2f FindIntersection(const Eigen::Vector2f A, const Eigen::Vector2f B);
 

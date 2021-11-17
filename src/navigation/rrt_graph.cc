@@ -39,12 +39,22 @@ void RRTGraph::AddVertex(Eigen::Vector2f q_new)
     tree_vertex.push_back(q_new);
 }
 
+std::vector<Eigen::Vector2f> RRTGraph::GetVertices()
+{
+    return tree_vertex;
+}
+
 void RRTGraph::AddEdge(Eigen::Vector2f q_near, Eigen::Vector2f q_new)
 {
     std::vector<Eigen::Vector2f> tree_pair;
     tree_pair.push_back(q_near);
     tree_pair.push_back(q_new);
     tree_edge.push_back(tree_pair);
+}
+
+std::vector<std::vector<Eigen::Vector2f>> RRTGraph::GetEdges()
+{
+    return tree_edge;
 }
 
 Eigen::Vector2f RRTGraph::GetRandq(float Cx, float Cy)
@@ -61,11 +71,13 @@ Eigen::Vector2f RRTGraph::GetClosestq(const Eigen::Vector2f q_rand)
     float magnitude {0};
     float min_dist {500000};  //potential bug
 
+    /*
     //TEST
     tree_vertex.push_back(Eigen::Vector2f(14,10));
     tree_vertex.push_back(Eigen::Vector2f(-12,4));
     tree_vertex.push_back(Eigen::Vector2f(-5,-11.21));
     tree_vertex.push_back(Eigen::Vector2f(2.23,16.7));
+    */
 
     for (auto& q:tree_vertex){
         delta_q = q_rand - q;
@@ -82,17 +94,15 @@ Eigen::Vector2f RRTGraph::GetClosestq(const Eigen::Vector2f q_rand)
 Eigen::Vector2f RRTGraph::GetNewq(const Eigen::Vector2f q_near, const Eigen::Vector2f q_rand, const float max_delta_q)
 {
     Eigen::Vector2f q = q_rand;    // output vector
-    Eigen::Vector2f delta_q (0,0); // delta between nodes
-    float magnitude {0};           // magnitude of nodes
     float angle {0};               // angle of magnitudes
 
-    delta_q = q_rand - q_near;
-    magnitude = delta_q.norm();
+    Eigen::Vector2f delta_q = q_rand - q_near; // delta between nodes
+    float magnitude = delta_q.norm();          // magnitude of nodes
 
     if (magnitude > max_delta_q){   
         angle = geometry::Angle(delta_q);
-        q.x() = max_delta_q*cos(angle);
-        q.y() = max_delta_q*sin(angle);
+        q.x() = q_near.x() + max_delta_q*cos(angle);
+        q.y() = q_near.y() + max_delta_q*sin(angle);
     }
 
     return q;
@@ -109,6 +119,7 @@ bool RRTGraph::IsNearGoal(const Eigen::Vector2f q, const Eigen::Vector2f q_goal,
     return is_close; 
 }
 
+// TODO **********************************************************************************
 void RRTGraph::FindShortestPath(const Eigen::Vector2f q_near, const Eigen::Vector2f q_new)
 {
     int tree_length = tree_edge.size();

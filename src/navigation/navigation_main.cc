@@ -73,9 +73,14 @@ DEFINE_string(loc_topic, "localization", "Name of ROS topic for localization");
 DEFINE_string(init_topic,
               "initialpose",
               "Name of ROS topic for initialization");
+DEFINE_string(set_pose_topic,
+              "/set_pose",
+              "Name of ROS topic for initialization");
 DEFINE_string(map, "maps/GDC1.txt", "Name of vector map file");
 
 bool run_ = true;
+bool set_pose_ = false;
+Eigen::Vector2f init_pose_ (0,0);
 sensor_msgs::LaserScan last_laser_msg_;
 Navigation* navigation_ = nullptr;
 
@@ -118,6 +123,12 @@ void GoToCallback(const geometry_msgs::PoseStamped& msg) {
       2.0 * atan2(msg.pose.orientation.z, msg.pose.orientation.w);
   printf("Goal: (%f,%f) %f\u00b0\n", loc.x(), loc.y(), angle);
   navigation_->SetNavGoal(loc, angle);
+
+  if (set_pose_ == true){
+    std::cout << "Building RRT..." << std::endl;
+    navigation_->BuildRRT(init_pose_, loc);
+  }
+  
 }
 
 void SignalHandler(int) {
@@ -136,15 +147,47 @@ void LocalizationCallback(const amrl_msgs::Localization2DMsg msg) {
   navigation_->UpdateLocation(Vector2f(msg.pose.x, msg.pose.y), msg.pose.theta);
 }
 
+void InitCallback(const amrl_msgs::Localization2DMsg& msg) {
+  const Vector2f init_loc(msg.pose.x, msg.pose.y);
+  const float init_angle = msg.pose.theta;
+  const string map = "maps/" + msg.map + ".txt";
+  printf("Initialized Location: (%f,%f) %f\u00b0\n",
+         init_loc.x(),
+         init_loc.y(),
+         RadToDeg(init_angle));
+  init_pose_ = init_loc;
+  
+  // Added for RRT
+  navigation_->InitMap(map.c_str());
+
+  set_pose_ = true;
+
+}
+
+void ProcessLive(ros::NodeHandle* n) {
+  std::cout << "Here we go again..." << std::endl;
+  ros::Subscriber initial_pose_sub = n->subscribe(
+      FLAGS_set_pose_topic.c_str(),
+      1,
+      InitCallback);
+
+  while (ros::ok() && run_) {
+    ros::spinOnce();
+    Sleep(0.01);
+  }
+}
+
 int main(int argc, char** argv) {
   google::ParseCommandLineFlags(&argc, &argv, false);
   signal(SIGINT, SignalHandler);
+
   // Initialize ROS.
   ros::init(argc, argv, "navigation", ros::init_options::NoSigintHandler);
   ros::NodeHandle n;
   navigation_ = new Navigation(FLAGS_map, &n);
-  navigation_->InitMap(FLAGS_map);
 
+  std::cout << "Here we go again..." << std::endl;
+  
   ros::Subscriber velocity_sub =
       n.subscribe(FLAGS_odom_topic, 1, &OdometryCallback);
   ros::Subscriber localization_sub =
@@ -153,6 +196,8 @@ int main(int argc, char** argv) {
       n.subscribe(FLAGS_laser_topic, 1, &LaserCallback);
   ros::Subscriber goto_sub =
       n.subscribe("/move_base_simple/goal", 1, &GoToCallback);
+  ros::Subscriber initial_pose_sub = 
+      n.subscribe(FLAGS_set_pose_topic.c_str(), 1, &InitCallback);
 
   RateLoop loop(20.0);
   while (run_ && ros::ok()) {

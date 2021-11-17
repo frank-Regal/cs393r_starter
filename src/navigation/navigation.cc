@@ -48,6 +48,7 @@ using visualization::DrawArc;
 using visualization::DrawPoint;
 using visualization::DrawLine;
 using visualization::DrawParticle;
+using visualization::DrawCross;
 
 using namespace math_util;
 using namespace ros_helpers;
@@ -62,6 +63,11 @@ AckermannCurvatureDriveMsg drive_msg_;
 const float kEpsilon = 1e-5;
 } //namespace
 
+std::vector<Eigen::Vector2f> q_near_;
+std::vector<Eigen::Vector2f> q_rand_;
+std::vector<Eigen::Vector2f> q_trim_;
+std::vector<Eigen::Vector2f> q_new_;
+Eigen::Vector2f nav_goal_;
 
 
 namespace navigation {
@@ -89,6 +95,7 @@ Navigation::Navigation(const string& map_file, ros::NodeHandle* n) :
 }
 
 void Navigation::SetNavGoal(const Vector2f& loc, float angle) {
+  nav_goal_ = loc;
 }
 
 void Navigation::UpdateLocation(const Eigen::Vector2f& loc, float angle) {
@@ -130,6 +137,7 @@ void Navigation::Run() {
   // If odometry has not been initialized, we can't do anything.
   if (!odom_initialized_) return;
 
+  //std::cout << "odom init" << std::endl;
   // The control iteration goes here. 
   // Feel free to make helper functions to structure the control appropriately.
   
@@ -137,16 +145,18 @@ void Navigation::Run() {
 
   // Eventually, you will have to set the control values to issue drive commands:
   // drive_msg_.curvature = ...;
-  drive_msg_.velocity = 0.9;
+  // drive_msg_.velocity = 0.9;
 
+  /*
+  // RRT Stuff ********************************************************
   Eigen::Vector2f random_num = tree_.GetRandq(20,20); //testing 1 2
   std::cout << "random_num: " << random_num << std::endl;
   Eigen::Vector2f closest_point = tree_.GetClosestq(random_num);
   std::cout << "closest_point: " << closest_point << "\n" << std::endl;
   //float ang = geometry::Angle(closest_point);
   //std::cout << "angle: " << ang << std::endl;
-  const uint32_t color = 0x89cdc9;
-  DrawPoint(Eigen::Vector2f(10,10), color, local_viz_msg_);
+  */
+  Vizualize();
 
   // Add timestamps to all messages.
   local_viz_msg_.header.stamp = ros::Time::now();
@@ -163,7 +173,7 @@ void Navigation::Run() {
 void Navigation::InitMap(const string& map_file)
 { // Load Map File. Called in navigation_main.cc
   map_.Load(map_file);
-  std::cout << "Initialized: " << map_file << std::endl;
+  std::cout << "Loaded Map: " << map_file << std::endl;
 }
 
 Eigen::Vector2f Navigation::FindIntersection(const Eigen::Vector2f q_near, const Eigen::Vector2f q_new_cur)
@@ -198,48 +208,66 @@ Eigen::Vector2f Navigation::FindIntersection(const Eigen::Vector2f q_near, const
   return output_q;
 }
 
-void Navigation::BuildRRT(const Eigen::Vector2f q_init, const int k, const float delta_q)
+void Navigation::BuildRRT(const Eigen::Vector2f q_init, const Eigen::Vector2f q_goal)
 { // Rapidly Exploring Random Tree
   
   // Input Definitions:
   // - q_init = intial configuration
   // - k = number of vertices
   // - delta_q = incremental distance
-  const uint32_t color = 0x89cdc9;
-  const uint32_t color2 = 0x89c9d7;
 
+  Eigen::Vector2f del = q_goal - q_init;
+  float mag_w_buff = del.norm()+5;
+  Eigen::Vector2f C (abs(q_init.x())+mag_w_buff, abs(q_init.y())+mag_w_buff); // c-space / exploration space
+
+  const float delta_q = 0.2;     // max distance for rrt
+  float goal_threshold = 0.2;    // meters
   Eigen::Vector2f q_rand (0,0);  // random node within the c-space
   Eigen::Vector2f q_near (0,0);  // nears node
   Eigen::Vector2f q_trim (0,0);  // holder for new node
   Eigen::Vector2f q_new  (0,0);  // holder for new node
-  Eigen::Vector2f C (20.0,20.0); // c-space / exploration space
-  Eigen::Vector2f q_goal (0,0);  // TODO change to Set_Nav_Goal Variables 
-  float goal_threshold = 0.5;    // meters
   bool goal_reached = false;     // check if robot is at goal yet
+  
+  tree_.SetInitNode(q_init);     // initialize the starting point of rrt
 
-  tree_.SetInitNode(q_init); // initialize the starting point of rrt
-
-  while(goal_reached == false)
+  while (goal_reached == false)
   {
     q_rand = tree_.GetRandq(C.x(), C.y());            // get a random node
     q_near = tree_.GetClosestq(q_rand);               // get the closest node to the random node
     q_trim = tree_.GetNewq(q_near, q_rand, delta_q);  // get a new q based on the max distance TODO: Need to add wall checking
+    //q_trim_.push_back(q_trim);                        // trim the straight line path to max predefined distance
     q_new  = FindIntersection(q_near, q_trim);        // determine if the map intersects with the new node
- 
-    visualization::DrawPoint(q_new, color, local_viz_msg_);
-    visualization::DrawLine(q_near, q_new, color2, global_viz_msg_);
-
+    //q_new_.push_back(q_new);
     goal_reached = tree_.IsNearGoal(q_new, q_goal,goal_threshold);  // is the node within the threshold of the goal
 
     if (goal_reached == true){
-      std::cout << "path found" << std::endl;
-      tree_.FindShortestPath(q_near, q_new);
+      std::cout << "path found!" << std::endl;
+      //tree_.FindShortestPath(q_near, q_new);
     } else {
       tree_.AddVertex(q_new);
       tree_.AddEdge(q_near,q_new);
     }
 
-    
   }
+
+  std::cout << "Done." << std::endl;
 }
+
+void Navigation::Vizualize()
+{
+  //const uint32_t color1 = 0xfc0303;
+  const uint32_t color2 = 0xe303fc;
+
+  for (auto& p:tree_.GetVertices()){
+    DrawPoint(p, color2, global_viz_msg_);
+  }
+
+  for (auto& l:tree_.GetEdges()){
+    DrawLine(l[0],l[1],color2,global_viz_msg_);
+  }
+
+  DrawCross(nav_goal_,0.2,0x034f00,global_viz_msg_);
+
+}
+
 }  // namespace navigation

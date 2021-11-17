@@ -12,7 +12,7 @@ class Graph {
 private:
 
     int nodes;
-    list<std::vector<Eigen::Vector2f>>* adjlist;
+    list<int>* adjlist;
     vector<bool> visited;
 
 public:
@@ -21,7 +21,7 @@ public:
     }
 
     Graph(int nodes) { // Allocate resources 
-        adjlist = new list<std::vector<Eigen::Vector2f>>[nodes];
+        adjlist = new list<int>[nodes];
         visited.resize(nodes, false);
         this->nodes = nodes;
     }
@@ -30,7 +30,7 @@ public:
         delete[] adjlist;
     }
 
-    void AddEdge(Eigen::Vector2f src, Eigen::Vector2f dst) {
+    void AddEdge(int src, int dst) {
         adjlist[src].push_back(dst);
         adjlist[dst].push_back(src);
     }

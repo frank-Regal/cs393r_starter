@@ -14,7 +14,7 @@ class RRTGraph
 private:
     std::vector<Eigen::Vector2f> tree_vertex;
     std::vector<std::vector<Eigen::Vector2f>> tree_edge;
-    
+
     Eigen::Vector2f init_node;
     std::deque<Eigen::Vector2f> path_to_goal;
     util_random::Random rng_;
@@ -45,6 +45,10 @@ void FindShortestPath(const Eigen::Vector2f q_near, const Eigen::Vector2f q_new)
 void ClearTree();
 
 void TestFunc();
+
+std::vector<Eigen::Vector2f> GetVertices();
+
+std::vector<std::vector<Eigen::Vector2f>> GetEdges();
 
 };
 
