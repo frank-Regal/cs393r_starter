@@ -104,7 +104,8 @@ void OdometryCallback(const nav_msgs::Odometry& msg) {
       Vector2f(msg.pose.pose.position.x, msg.pose.pose.position.y),
       2.0 * atan2(msg.pose.pose.orientation.z, msg.pose.pose.orientation.w),
       Vector2f(msg.twist.twist.linear.x, msg.twist.twist.linear.y),
-      msg.twist.twist.angular.z);
+      msg.twist.twist.angular.z,
+      ros::Time::now().toNSec());
 }
 
 void GoToCallback(const geometry_msgs::PoseStamped& msg) {
