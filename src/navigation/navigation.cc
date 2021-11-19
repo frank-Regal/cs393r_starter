@@ -71,8 +71,9 @@ std::vector<Eigen::Vector2f> q_trim_;
 std::vector<Eigen::Vector2f> q_new_;
 Eigen::Vector2f nav_goal_;
 
-namespace navigation {
 
+namespace navigation {
+// Given Methods
 Navigation::Navigation(const string& map_file, ros::NodeHandle* n) :
     odom_initialized_(false),
     localization_initialized_(false),
@@ -104,6 +105,10 @@ void Navigation::UpdateLocation(const Eigen::Vector2f& loc, float angle) {
   localization_initialized_ = true;
   robot_loc_ = loc;
   robot_angle_ = angle;
+
+  std::cout << "robot_loc_ x: " << robot_loc_.x() 
+            << "; robot_loc_ y: " << robot_loc_.y()
+            << "; robot_angle_  " << robot_angle_ << std::endl;
 }
 
 void Navigation::UpdateOdometry(const Vector2f& loc,
@@ -124,6 +129,11 @@ void Navigation::UpdateOdometry(const Vector2f& loc,
   }
   odom_loc_ = loc;
   odom_angle_ = angle;
+
+  std::cout << "odom_loc_ x: " << odom_loc_.x()
+            << "; odom_loc_ y: " << odom_loc_.y()
+            << "; odom_angle_: " << odom_angle_ 
+            << "\n\n" <<std::endl;
 
   odom_stamp_ = time - car_params::sensing_latency;
   last_odom_stamp_ = odom_stamp_;
@@ -180,7 +190,7 @@ void Navigation::Run(){
   visualization::ClearVisualizationMsg(local_viz_msg_);
   visualization::ClearVisualizationMsg(global_viz_msg_);
 
-  // If odometry has not been initialized, we can't do anything.
+  // If odometry has not been initialized or path is not planned we can't do anything.
   if (!odom_initialized_ or !path_planned_) return;
 
   //Latency Compensation
@@ -245,7 +255,7 @@ void Navigation::Run(){
   //obstacle_avoidance::DrawCarLocal(local_viz_msg_, odom_state_tf.position, odom_state_tf.theta);
 
   // "Carrot on a stick" goal point, and resulting goal curvature
-  Eigen::Vector2f goal_point(4, 0.0);
+  Eigen::Vector2f goal_point(3, 0);
   float goal_curvature = obstacle_avoidance::GetCurvatureFromGoalPoint(goal_point);
   goal_curvature = Clamp(goal_curvature, car_params::min_curvature, car_params::max_curvature);
 
@@ -270,13 +280,13 @@ void Navigation::Run(){
     obstacle_avoidance::EvaluateClearanceWithPointCloud(path_options[curve_index], collision_bounds, transformed_point_cloud_);
 
     // Visualization test code
-    // visualization::DrawPathOption(path_options[curve_index].curvature, path_options[curve_index].free_path_length, path_options[curve_index].clearance, local_viz_msg_);
-    // visualization::DrawCross(path_options[curve_index].obstruction, 0.1,  0x0046FF, local_viz_msg_);
+    //visualization::DrawPathOption(path_options[curve_index].curvature, path_options[curve_index].free_path_length, path_options[curve_index].clearance, local_viz_msg_);
+    //visualization::DrawCross(path_options[curve_index].obstruction, 0.1,  0x0046FF, local_viz_msg_);
   }
 
   // 6) Select best path from scoring function
   struct PathOption best_path = obstacle_avoidance::ChooseBestPath(path_options,goal_point);
-  //obstacle_avoidance::VisualizeObstacleAvoidanceInfo(goal_point,path_options,best_path,local_viz_msg_);
+  obstacle_avoidance::VisualizeObstacleAvoidanceInfo(goal_point,path_options,best_path,local_viz_msg_);
   
   // 7) Publish commands with 1-D TOC, update vector of previous vehicle commands
   TimeOptimalControl(best_path);
@@ -438,5 +448,6 @@ void Navigation::Vizualize()
   DrawCross(nav_goal_,0.2,green,global_viz_msg_);
 
 }
+
 
 }  // namespace navigation
