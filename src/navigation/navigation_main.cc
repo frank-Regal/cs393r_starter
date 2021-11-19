@@ -45,6 +45,7 @@
 #include "shared/math/math_util.h"
 #include "shared/util/timer.h"
 #include "shared/ros/ros_helpers.h"
+#include "visualization/visualization.h"
 
 #include "navigation.h"
 
@@ -60,6 +61,10 @@ using ros_helpers::SetRosVector;
 using std::string;
 using std::vector;
 using Eigen::Vector2f;
+using visualization::DrawArc;
+using visualization::DrawPoint;
+using visualization::DrawLine;
+using visualization::DrawParticle;
 
 // Create command line arguments
 DEFINE_string(laser_topic, "scan", "Name of ROS topic for LIDAR data");
@@ -69,9 +74,15 @@ DEFINE_string(init_topic,
               "initialpose",
               "Name of ROS topic for initialization");
 DEFINE_string(map, "maps/GDC1.txt", "Name of vector map file");
+// RRT Add 
+DEFINE_string(set_pose_topic,
+              "/set_pose",
+              "Name of ROS topic for initialization");
 
 
 bool run_ = true;
+bool set_pose_ = false; // RRT Add 
+Eigen::Vector2f init_pose_ (0,0); // RRT Add
 sensor_msgs::LaserScan last_laser_msg_;
 Navigation* navigation_ = nullptr;
 
@@ -84,6 +95,7 @@ void LaserCallback(const sensor_msgs::LaserScan& msg) {
   // Location of the laser on the robot. Assumes the laser is forward-facing.
   const Vector2f kLaserLoc(0.2, 0);
 
+  static vector<Vector2f> point_cloud_; //RRT Add
   // Convert the LaserScan to a point cloud
   // The LaserScan parameters are accessible as follows:
   // msg.angle_increment // Angular increment between subsequent rays
@@ -114,8 +126,6 @@ void OdometryCallback(const nav_msgs::Odometry& msg) {
   if (FLAGS_v > 0) {
     printf("Odometry t=%f\n", msg.header.stamp.toSec());
   }
-
-
   navigation_->UpdateOdometry(
       Vector2f(msg.pose.pose.position.x, msg.pose.pose.position.y),
       2.0 * atan2(msg.pose.pose.orientation.z, msg.pose.pose.orientation.w),
@@ -130,6 +140,12 @@ void GoToCallback(const geometry_msgs::PoseStamped& msg) {
       2.0 * atan2(msg.pose.orientation.z, msg.pose.orientation.w);
   printf("Goal: (%f,%f) %f\u00b0\n", loc.x(), loc.y(), angle);
   navigation_->SetNavGoal(loc, angle);
+
+  // RRT Add
+  if (set_pose_ == true){
+    std::cout << "Building RRT..." << std::endl;
+    navigation_->BuildRRT(init_pose_, loc);
+  }
 }
 
 void SignalHandler(int) {
@@ -148,9 +164,41 @@ void LocalizationCallback(const amrl_msgs::Localization2DMsg msg) {
   navigation_->UpdateLocation(Vector2f(msg.pose.x, msg.pose.y), msg.pose.theta);
 }
 
+// RRT Add
+void InitCallback(const amrl_msgs::Localization2DMsg& msg) {
+  const Vector2f init_loc(msg.pose.x, msg.pose.y);
+  const float init_angle = msg.pose.theta;
+  const string map = "maps/" + msg.map + ".txt";
+  printf("Initialized Location: (%f,%f) %f\u00b0\n",
+         init_loc.x(),
+         init_loc.y(),
+         RadToDeg(init_angle));
+  init_pose_ = init_loc;
+  
+  // Added for RRT
+  navigation_->InitMap(map.c_str());
+
+  set_pose_ = true;
+
+}
+
+void ProcessLive(ros::NodeHandle* n) {
+  std::cout << "Here we go again..." << std::endl;
+  ros::Subscriber initial_pose_sub = n->subscribe(
+      FLAGS_set_pose_topic.c_str(),
+      1,
+      InitCallback);
+
+  while (ros::ok() && run_) {
+    ros::spinOnce();
+    Sleep(0.01);
+  }
+}
+
 int main(int argc, char** argv) {
   google::ParseCommandLineFlags(&argc, &argv, false);
   signal(SIGINT, SignalHandler);
+
   // Initialize ROS.
   ros::init(argc, argv, "navigation", ros::init_options::NoSigintHandler);
   ros::NodeHandle n;
@@ -164,14 +212,14 @@ int main(int argc, char** argv) {
       n.subscribe(FLAGS_laser_topic, 1, &LaserCallback);
   ros::Subscriber goto_sub =
       n.subscribe("/move_base_simple/goal", 1, &GoToCallback);
+  ros::Subscriber initial_pose_sub = 
+      n.subscribe(FLAGS_set_pose_topic.c_str(), 1, &InitCallback);
 
   RateLoop loop(20.0);
   while (run_ && ros::ok()) {
     ros::spinOnce();
     navigation_->Run();
     loop.Sleep();
-
-    //ros::Duration(.215).sleep();
   }
   delete navigation_;
   return 0;

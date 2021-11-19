@@ -60,7 +60,8 @@ TARGET_LINK_LIBRARIES(particle_filter shared_library ${libs})
 
 ROSBUILD_ADD_EXECUTABLE(navigation
                         src/navigation/navigation_main.cc
-                        src/navigation/navigation.cc)
+                        src/navigation/navigation.cc
+                        src/navigation/rrt_graph.cc)
 TARGET_LINK_LIBRARIES(navigation shared_library obstacle_avoidance ${libs})
 
 ADD_EXECUTABLE(eigen_tutorial

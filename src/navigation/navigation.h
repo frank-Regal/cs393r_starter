@@ -15,14 +15,22 @@
 /*!
 \file    navigation.h
 \brief   Interface for reference Navigation class.
-\author  Joydeep Biswas, (C) 2019
+\author  Mary Tebben and Frank Regal (Team Jetsons)
+\adopted from  Dr. Joydeep Biswas & Team Kachow
+\(C) 2019
 */
 //========================================================================
 
 #include <vector>
 
 #include "eigen3/Eigen/Dense"
+#include "vector_map/vector_map.h"
+#include "rrt_graph.h"
 #include "ros/ros.h"
+
+using std::string;
+using geometry::line2f;
+using vector_map::VectorMap;
 
 #ifndef NAVIGATION_H
 #define NAVIGATION_H
@@ -68,6 +76,11 @@ struct TimeShiftedTF{
   uint64_t stamp = 0;
 };
 
+struct Pose {
+  Eigen::Vector2f loc;
+  float angle;
+};
+
 class Navigation {
  public:
 
@@ -97,6 +110,13 @@ class Navigation {
   void TimeOptimalControl(const PathOption& path);
 
   std::vector<CommandStamped> vel_commands_;
+
+  // Added the following for RRT
+  void BuildRRT(const Eigen::Vector2f q_init, const Eigen::Vector2f q_goal);
+  
+  void InitMap(const string& map_file);
+
+  void Vizualize();
 
  private:
 
@@ -148,6 +168,14 @@ class Navigation {
   bool first_cycle = true;
 
   void TransformPointCloud(TimeShiftedTF transform);
+
+  // Added for RRT
+  Eigen::Vector2f FindIntersection(const Eigen::Vector2f A, const Eigen::Vector2f B);
+
+  RRTGraph tree_;
+
+  // Map of the environment.
+  vector_map::VectorMap map_;
 };
 
 }  // namespace navigation

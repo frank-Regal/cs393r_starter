@@ -28,11 +28,14 @@
 #include "glog/logging.h"
 #include "ros/ros.h"
 #include "shared/math/math_util.h"
+#include "shared/math/geometry.h"
 #include "shared/util/timer.h"
 #include "shared/ros/ros_helpers.h"
 #include "navigation.h"
 #include "visualization/visualization.h"
-
+#include "rrt_graph.h"
+#include "shared/math/line2d.h"
+#include "vector_map/vector_map.h"
 #include "obstacle_avoidance/obstacle_avoidance.h"
 #include "obstacle_avoidance/car_params.h"
 
@@ -41,6 +44,13 @@ using amrl_msgs::AckermannCurvatureDriveMsg;
 using amrl_msgs::VisualizationMsg;
 using std::string;
 using std::vector;
+using geometry::line2f;
+using vector_map::VectorMap;
+using visualization::DrawArc;
+using visualization::DrawPoint;
+using visualization::DrawLine;
+using visualization::DrawParticle;
+using visualization::DrawCross;
 
 using namespace math_util;
 using namespace ros_helpers;
@@ -54,6 +64,12 @@ AckermannCurvatureDriveMsg drive_msg_;
 // Epsilon value for handling limited numerical precision.
 const float kEpsilon = 1e-5;
 } //namespace
+
+std::vector<Eigen::Vector2f> q_near_;
+std::vector<Eigen::Vector2f> q_rand_;
+std::vector<Eigen::Vector2f> q_trim_;
+std::vector<Eigen::Vector2f> q_new_;
+Eigen::Vector2f nav_goal_;
 
 namespace navigation {
 
@@ -80,6 +96,7 @@ Navigation::Navigation(const string& map_file, ros::NodeHandle* n) :
 }
 
 void Navigation::SetNavGoal(const Vector2f& loc, float angle) {
+  nav_goal_ = loc;
 }
 
 void Navigation::UpdateLocation(const Eigen::Vector2f& loc, float angle) {
@@ -107,11 +124,9 @@ void Navigation::UpdateOdometry(const Vector2f& loc,
   odom_loc_ = loc;
   odom_angle_ = angle;
 
-  //std::cout << "omega, vel, loc, angle: " << ang_vel << ", " << robot_vel_[0] << ", " << loc << ", " << angle << std::endl;
-
   odom_stamp_ = time - car_params::sensing_latency;
   last_odom_stamp_ = odom_stamp_;
-  //std::cout << "odom stamp: " << odom_stamp_ << std::endl;
+  
   has_new_odom_ = true;
 }
 
@@ -122,7 +137,7 @@ void Navigation::ObservePointCloud(const vector<Vector2f>& cloud,
   has_new_points_= true;
 }
 
-//Solve the TOC Problem
+//Solve the TOC Problem / Obstacle Avoidance
 void Navigation::TimeOptimalControl(const PathOption& path) {
     double current_speed = odom_state_tf.speed;
     double min_stop_distance = car_params::safe_distance-0.5*current_speed*current_speed/car_params::min_acceleration; //calculate the minimum stopping distance at current velocity
@@ -290,6 +305,9 @@ void Navigation::Run(){
   CommandStamped drive_cmd(drive_msg_.velocity, drive_msg_.curvature, drive_msg_.header.stamp.toNSec() + car_params::actuation_latency);
   vel_commands_.push_back(drive_cmd);
 
+  // Vizualize RRT
+  Vizualize();
+
   // Add timestamps to all messages.
   local_viz_msg_.header.stamp = ros::Time::now();
   global_viz_msg_.header.stamp = ros::Time::now();
@@ -297,6 +315,129 @@ void Navigation::Run(){
   // Publish messages.
   viz_pub_.publish(local_viz_msg_);
   viz_pub_.publish(global_viz_msg_);
+}
+
+// Added the Following for RRT
+void Navigation::InitMap(const string& map_file)
+{ // Load Map File. Called in navigation_main.cc
+  map_.Load(map_file);
+  std::cout << "Loaded Map: " << map_file << std::endl;
+}
+
+Eigen::Vector2f Navigation::FindIntersection(const Eigen::Vector2f q_near, const Eigen::Vector2f q_new_cur)
+{ // Set a new node if the map intersects
+
+  // Create Line from closest node to the new node
+  line2f q_line (q_near.x(),q_near.y(), q_new_cur.x(), q_new_cur.y());
+  Eigen::Vector2f output_q = q_new_cur;
+
+  Eigen::Vector2f delta_q (0,0);
+  Eigen::Vector2f closest_q (0,0);
+  float magnitude {0};
+  float min_dist {500000};  //potential bug
+
+
+  for (size_t i {0}; i < map_.lines.size(); ++i){
+
+    const line2f map_line = map_.lines[i];
+    bool intersects = map_line.Intersection(q_line, &closest_q);
+    
+    if (intersects == true){
+      delta_q = q_near - closest_q;
+      magnitude = delta_q.norm();
+
+      // find the shortest intersecting line
+      if (magnitude < min_dist){
+        output_q = closest_q;
+        min_dist = magnitude;
+      }
+    }
+  }
+
+  return output_q;
+}
+
+void Navigation::BuildRRT(const Eigen::Vector2f q_init, const Eigen::Vector2f q_goal)
+{ // Rapidly Exploring Random Tree
+  
+  // Input Definitions:
+  // - q_init = intial configuration
+  // - k = number of vertices
+  // - delta_q = incremental distance
+
+  Eigen::Vector2f del = q_goal - q_init;
+  float mag_w_buff = del.norm()+5;
+  Eigen::Vector2f C (abs(q_init.x())+mag_w_buff, abs(q_init.y())+mag_w_buff); // c-space / exploration space
+
+  const float delta_q = 0.2;     // max distance for rrt
+  float goal_threshold = 0.3;    // meters
+  Eigen::Vector2f q_rand (0,0);  // random node within the c-space
+  Eigen::Vector2f q_near (0,0);  // nears node
+  Eigen::Vector2f q_trim (0,0);  // holder for new node
+  Eigen::Vector2f q_new  (0,0);  // holder for new node
+  bool goal_reached = false;     // check if robot is at goal yet
+  
+  tree_.SetInitNode(q_init);     // initialize the starting point of rrt
+
+  while (goal_reached == false)
+  {
+    q_rand = tree_.GetRandq(C.x(), C.y());            // get a random node
+    q_near = tree_.GetClosestq(q_rand);               // get the closest node to the random node
+    q_trim = tree_.GetNewq(q_near, q_rand, delta_q);  // get a new q based on the max distance    
+    q_new  = FindIntersection(q_near, q_trim);        // determine if the map intersects with the new node
+    goal_reached = tree_.IsNearGoal(q_new, q_goal,goal_threshold);  // is the node within the threshold of the goal
+
+    if (goal_reached == true){
+      std::cout << "path found!" << std::endl;
+      tree_.FindPathBack(q_near,q_new);
+    } else {
+      tree_.AddVertex(q_new);
+      tree_.AddEdge(q_near,q_new);
+    }
+  } 
+  
+  for (auto& f:tree_.GetPathBack()){
+    std::cout << "x: " << f.x() 
+              << "; y: " << f.y() << std::endl;
+  }
+
+  std::cout << "Done." << std::endl;
+}
+
+void Navigation::Vizualize()
+{ // Vizualize the RRT Tree
+
+  // Set Colors
+  const uint32_t black = 0x000000;
+  const uint32_t green = 0x034f00;
+  /*
+  const uint32_t magenta = 0xe303fc;
+
+  // Vizualize the Tree Nodes
+  for (auto& p:tree_.GetVertices()){
+    DrawPoint(p, magenta, global_viz_msg_);
+  }
+
+  // Vizualize the Tree Edges
+  for (auto& l:tree_.GetEdges()){
+    DrawLine(l[0],l[1],magenta,global_viz_msg_);
+  }
+  */
+  // Vizualize the Path Back
+  int i = 0;
+  Eigen::Vector2f buff;
+  for (auto& f:tree_.GetPathBack()){
+    DrawPoint(f,black,global_viz_msg_);
+    if (i != 0){
+      DrawLine(buff, f, black, global_viz_msg_);
+    }
+    buff = f;
+    i++;
+  }
+
+  // Vizualize the Navigation Goal
+  DrawCross(nav_goal_,0.2,green,global_viz_msg_);
+
 }
 
 }  // namespace navigation
