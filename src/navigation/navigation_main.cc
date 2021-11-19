@@ -26,6 +26,7 @@
 #include <string.h>
 #include <inttypes.h>
 #include <vector>
+#include <iostream>
 
 #include "glog/logging.h"
 #include "gflags/gflags.h"
@@ -145,6 +146,7 @@ void GoToCallback(const geometry_msgs::PoseStamped& msg) {
   if (set_pose_ == true){
     std::cout << "Building RRT..." << std::endl;
     navigation_->BuildRRT(init_pose_, loc);
+    navigation_->IsPathPlanned(true);
   }
 }
 
@@ -180,10 +182,12 @@ void InitCallback(const amrl_msgs::Localization2DMsg& msg) {
 
   set_pose_ = true;
 
+  std::cout << "Set Navigation Goal..." << std::endl;
+
 }
 
 void ProcessLive(ros::NodeHandle* n) {
-  std::cout << "Here we go again..." << std::endl;
+  
   ros::Subscriber initial_pose_sub = n->subscribe(
       FLAGS_set_pose_topic.c_str(),
       1,
@@ -204,6 +208,7 @@ int main(int argc, char** argv) {
   ros::NodeHandle n;
   navigation_ = new Navigation(FLAGS_map, &n);
 
+  std::cout << "Waiting for set pose..." << std::endl;
   ros::Subscriber velocity_sub =
       n.subscribe(FLAGS_odom_topic, 1, &OdometryCallback);
   ros::Subscriber localization_sub =

@@ -118,6 +118,8 @@ class Navigation {
 
   void Vizualize();
 
+  void IsPathPlanned(bool path_planned);
+
  private:
 
   // Whether odometry has been initialized.
@@ -176,6 +178,8 @@ class Navigation {
 
   // Map of the environment.
   vector_map::VectorMap map_;
+
+  bool path_planned_;
 };
 
 }  // namespace navigation

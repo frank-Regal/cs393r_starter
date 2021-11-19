@@ -82,7 +82,8 @@ Navigation::Navigation(const string& map_file, ros::NodeHandle* n) :
     robot_omega_(0),
     nav_complete_(true),
     nav_goal_loc_(0, 0),
-    nav_goal_angle_(0) {
+    nav_goal_angle_(0),
+    path_planned_(false) {
   drive_pub_ = n->advertise<AckermannCurvatureDriveMsg>(
       "ackermann_curvature_drive", 1);
   viz_pub_ = n->advertise<VisualizationMsg>("visualization", 1);
@@ -180,7 +181,7 @@ void Navigation::Run(){
   visualization::ClearVisualizationMsg(global_viz_msg_);
 
   // If odometry has not been initialized, we can't do anything.
-  if (!odom_initialized_) return;
+  if (!odom_initialized_ or !path_planned_) return;
 
   //Latency Compensation
   obstacle_avoidance::CleanVelocityBuffer(vel_commands_, std::min(odom_stamp_, point_cloud_stamp_));
@@ -324,6 +325,11 @@ void Navigation::InitMap(const string& map_file)
   std::cout << "Loaded Map: " << map_file << std::endl;
 }
 
+void Navigation::IsPathPlanned(bool path_planned)
+{
+  path_planned_ = path_planned;
+}
+
 Eigen::Vector2f Navigation::FindIntersection(const Eigen::Vector2f q_near, const Eigen::Vector2f q_new_cur)
 { // Set a new node if the map intersects
 
@@ -359,11 +365,7 @@ Eigen::Vector2f Navigation::FindIntersection(const Eigen::Vector2f q_near, const
 
 void Navigation::BuildRRT(const Eigen::Vector2f q_init, const Eigen::Vector2f q_goal)
 { // Rapidly Exploring Random Tree
-  
-  // Input Definitions:
-  // - q_init = intial configuration
-  // - k = number of vertices
-  // - delta_q = incremental distance
+  int k = 0;
 
   Eigen::Vector2f del = q_goal - q_init;
   float mag_w_buff = del.norm()+5;
@@ -390,18 +392,15 @@ void Navigation::BuildRRT(const Eigen::Vector2f q_init, const Eigen::Vector2f q_
     if (goal_reached == true){
       std::cout << "path found!" << std::endl;
       tree_.FindPathBack(q_near,q_new);
+    } else if (k > 100000) {
+      std::cout << "path not found :( \n\nretry!" << std::endl;
+      break;
     } else {
       tree_.AddVertex(q_new);
       tree_.AddEdge(q_near,q_new);
     }
+    k++;
   } 
-  
-  for (auto& f:tree_.GetPathBack()){
-    std::cout << "x: " << f.x() 
-              << "; y: " << f.y() << std::endl;
-  }
-
-  std::cout << "Done." << std::endl;
 }
 
 void Navigation::Vizualize()
