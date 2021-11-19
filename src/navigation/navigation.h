@@ -180,6 +180,11 @@ class Navigation {
   vector_map::VectorMap map_;
 
   bool path_planned_;
+
+  // Path Follower
+  void LocallySmoothedPathFollower();
+  // Path following navigation angle
+  Eigen::Vector2f path_goal_;
 };
 
 }  // namespace navigation

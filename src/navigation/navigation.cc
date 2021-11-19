@@ -15,6 +15,7 @@
 /*!
 \file    navigation.cc
 \brief   Starter code for navigation.
+//       Obstacle Avoidance implementation from Ka-Chow
 \author  Joydeep Biswas, (C) 2019
 */
 //========================================================================
@@ -449,5 +450,24 @@ void Navigation::Vizualize()
 
 }
 
+void Navigation::LocallySmoothedPathFollower()
+{
+  // Find farthest waypoint that can be reached with a straight line
+  // robot_loc
+  // tree_.GetPathBack()
+  Eigen::Vector2f closest_point (0,0);
+
+  for (auto& f:tree_.GetPathBack()){
+    // compare virtual line between vehicle location and path waypoints to map
+    line2f robot_line (robot_loc_.x(),robot_loc_.y(), f.x(), f.y());
+    for (size_t i {0}; i < map_.lines.size(); ++i){
+      const line2f map_line = map_.lines[i];
+      bool intersects = map_line.Intersection(robot_line, &closest_point);
+      if (intersects == true)
+        return;
+    }
+    path_goal_ = f;
+  }
+}
 
 }  // namespace navigation
