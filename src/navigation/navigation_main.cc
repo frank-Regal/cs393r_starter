@@ -146,7 +146,7 @@ void GoToCallback(const geometry_msgs::PoseStamped& msg) {
   if (set_pose_ == true){
     std::cout << "Building RRT..." << std::endl;
     navigation_->BuildRRT(init_pose_, loc);
-    navigation_->IsPathPlanned(true);
+    //navigation_->IsPathPlanned(true);
   }
 }
 

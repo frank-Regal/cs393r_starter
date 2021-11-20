@@ -182,7 +182,7 @@ class Navigation {
   bool path_planned_;
 
   // Path Follower
-  void LocallySmoothedPathFollower();
+  Eigen::Vector2f LocallySmoothedPathFollower(const Eigen::Vector2f robot_loc);
   // Path following navigation angle
   Eigen::Vector2f path_goal_;
 };

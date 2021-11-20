@@ -85,7 +85,8 @@ Navigation::Navigation(const string& map_file, ros::NodeHandle* n) :
     nav_complete_(true),
     nav_goal_loc_(0, 0),
     nav_goal_angle_(0),
-    path_planned_(false) {
+    path_planned_(false),
+    path_goal_(0,0) {
   drive_pub_ = n->advertise<AckermannCurvatureDriveMsg>(
       "ackermann_curvature_drive", 1);
   viz_pub_ = n->advertise<VisualizationMsg>("visualization", 1);
@@ -107,9 +108,11 @@ void Navigation::UpdateLocation(const Eigen::Vector2f& loc, float angle) {
   robot_loc_ = loc;
   robot_angle_ = angle;
 
+  /*
   std::cout << "robot_loc_ x: " << robot_loc_.x() 
             << "; robot_loc_ y: " << robot_loc_.y()
             << "; robot_angle_  " << robot_angle_ << std::endl;
+            */
 }
 
 void Navigation::UpdateOdometry(const Vector2f& loc,
@@ -131,10 +134,12 @@ void Navigation::UpdateOdometry(const Vector2f& loc,
   odom_loc_ = loc;
   odom_angle_ = angle;
 
+  /*
   std::cout << "odom_loc_ x: " << odom_loc_.x()
             << "; odom_loc_ y: " << odom_loc_.y()
             << "; odom_angle_: " << odom_angle_ 
             << "\n\n" <<std::endl;
+            */
 
   odom_stamp_ = time - car_params::sensing_latency;
   last_odom_stamp_ = odom_stamp_;
@@ -256,7 +261,9 @@ void Navigation::Run(){
   //obstacle_avoidance::DrawCarLocal(local_viz_msg_, odom_state_tf.position, odom_state_tf.theta);
 
   // "Carrot on a stick" goal point, and resulting goal curvature
-  Eigen::Vector2f goal_point(3, 0);
+  path_goal_ = LocallySmoothedPathFollower(robot_loc_);
+
+  Eigen::Vector2f goal_point (4,0); // (3, 0);
   float goal_curvature = obstacle_avoidance::GetCurvatureFromGoalPoint(goal_point);
   goal_curvature = Clamp(goal_curvature, car_params::min_curvature, car_params::max_curvature);
 
@@ -403,6 +410,7 @@ void Navigation::BuildRRT(const Eigen::Vector2f q_init, const Eigen::Vector2f q_
     if (goal_reached == true){
       std::cout << "path found!" << std::endl;
       tree_.FindPathBack(q_near,q_new);
+      path_planned_ = true;
     } else if (k > 100000) {
       std::cout << "path not found :( \n\nretry!" << std::endl;
       break;
@@ -420,9 +428,8 @@ void Navigation::Vizualize()
   // Set Colors
   const uint32_t black = 0x000000;
   const uint32_t green = 0x034f00;
-  /*
   const uint32_t magenta = 0xe303fc;
-
+  /*
   // Vizualize the Tree Nodes
   for (auto& p:tree_.GetVertices()){
     DrawPoint(p, magenta, global_viz_msg_);
@@ -448,26 +455,37 @@ void Navigation::Vizualize()
   // Vizualize the Navigation Goal
   DrawCross(nav_goal_,0.2,green,global_viz_msg_);
 
+  DrawCross(path_goal_,0.2,magenta,global_viz_msg_);
+
 }
 
-void Navigation::LocallySmoothedPathFollower()
+Eigen::Vector2f Navigation::LocallySmoothedPathFollower(const Eigen::Vector2f robot_loc)
 {
   // Find farthest waypoint that can be reached with a straight line
   // robot_loc
   // tree_.GetPathBack()
   Eigen::Vector2f closest_point (0,0);
+  Eigen::Vector2f path_goal (0,0);
+  int size = tree_.GetPathBack().size();
+  int j=0;
 
   for (auto& f:tree_.GetPathBack()){
     // compare virtual line between vehicle location and path waypoints to map
-    line2f robot_line (robot_loc_.x(),robot_loc_.y(), f.x(), f.y());
+    line2f robot_line (robot_loc.x(),robot_loc.y(), f.x(), f.y());
     for (size_t i {0}; i < map_.lines.size(); ++i){
       const line2f map_line = map_.lines[i];
       bool intersects = map_line.Intersection(robot_line, &closest_point);
       if (intersects == true)
-        return;
+        return path_goal;  
     }
-    path_goal_ = f;
+    path_goal = f;
+    if(j == (size-1))
+      path_goal = nav_goal_;
+    j++;
   }
+  
+
+  return path_goal;
 }
 
 }  // namespace navigation
