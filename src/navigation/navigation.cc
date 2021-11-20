@@ -261,8 +261,13 @@ void Navigation::Run(){
   //obstacle_avoidance::DrawCarLocal(local_viz_msg_, odom_state_tf.position, odom_state_tf.theta);
 
   // "Carrot on a stick" goal point, and resulting goal curvature
-  path_goal_ = LocallySmoothedPathFollower(robot_loc_);
-
+  path_goal_ = LocallySmoothedPathFollower(robot_loc_); // returns global frame point
+  Eigen::Vector2f path_goal_local = (path_goal_-robot_loc_);// + odom_loc_;
+  std::cout << "robot_location_.x: " << robot_loc_.x()
+            << "; robot_location_.y: " << robot_loc_.y()
+            << "; path_goal_local_.x: " << path_goal_local.x()
+            << "; path_goal_local_.y: " << path_goal_local.y()
+            << std::endl;
   Eigen::Vector2f goal_point (4,0); // (3, 0);
   float goal_curvature = obstacle_avoidance::GetCurvatureFromGoalPoint(goal_point);
   goal_curvature = Clamp(goal_curvature, car_params::min_curvature, car_params::max_curvature);
@@ -411,7 +416,7 @@ void Navigation::BuildRRT(const Eigen::Vector2f q_init, const Eigen::Vector2f q_
       std::cout << "path found!" << std::endl;
       tree_.FindPathBack(q_near,q_new);
       path_planned_ = true;
-    } else if (k > 100000) {
+    } else if (k > 1000000) {
       std::cout << "path not found :( \n\nretry!" << std::endl;
       break;
     } else {
@@ -467,6 +472,7 @@ Eigen::Vector2f Navigation::LocallySmoothedPathFollower(const Eigen::Vector2f ro
   Eigen::Vector2f closest_point (0,0);
   Eigen::Vector2f path_goal (0,0);
   int size = tree_.GetPathBack().size();
+  float max_carrot_dist = 4;
 
   for (int j {0}; j < size; j++){
     // compare virtual line between vehicle location and path waypoints to map
@@ -474,7 +480,7 @@ Eigen::Vector2f Navigation::LocallySmoothedPathFollower(const Eigen::Vector2f ro
     for (size_t i {0}; i < map_.lines.size(); ++i){
       const line2f map_line = map_.lines[i];
       bool intersects = map_line.Intersection(robot_line, &closest_point);
-      if (intersects == true)
+      if (intersects == true or (robot_line.Length() > max_carrot_dist))
         return path_goal;  
     }
     path_goal = tree_.GetPathBack()[j];
