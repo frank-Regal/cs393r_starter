@@ -467,24 +467,20 @@ Eigen::Vector2f Navigation::LocallySmoothedPathFollower(const Eigen::Vector2f ro
   Eigen::Vector2f closest_point (0,0);
   Eigen::Vector2f path_goal (0,0);
   int size = tree_.GetPathBack().size();
-  int j=0;
 
-  for (auto& f:tree_.GetPathBack()){
+  for (int j {0}; j < size; j++){
     // compare virtual line between vehicle location and path waypoints to map
-    line2f robot_line (robot_loc.x(),robot_loc.y(), f.x(), f.y());
+    line2f robot_line (robot_loc.x(),robot_loc.y(), tree_.GetPathBack()[j].x(), tree_.GetPathBack()[j].y());
     for (size_t i {0}; i < map_.lines.size(); ++i){
       const line2f map_line = map_.lines[i];
       bool intersects = map_line.Intersection(robot_line, &closest_point);
       if (intersects == true)
         return path_goal;  
     }
-    path_goal = f;
+    path_goal = tree_.GetPathBack()[j];
     if(j == (size-1))
       path_goal = nav_goal_;
-    j++;
   }
-  
-
   return path_goal;
 }
 
