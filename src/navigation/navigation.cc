@@ -269,7 +269,7 @@ void Navigation::Run(){
             << "; path_goal_local_.x: " << path_goal_local.x()
             << "; path_goal_local_.y: " << path_goal_local.y()
             << std::endl;
-  Eigen::Vector2f goal_point (4,0); // (3, 0);
+  Eigen::Vector2f goal_point = path_goal_; // (3, 0);
   float goal_curvature = obstacle_avoidance::GetCurvatureFromGoalPoint(goal_point);
   goal_curvature = Clamp(goal_curvature, car_params::min_curvature, car_params::max_curvature);
 
