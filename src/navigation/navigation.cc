@@ -71,6 +71,7 @@ std::vector<Eigen::Vector2f> q_rand_;
 std::vector<Eigen::Vector2f> q_trim_;
 std::vector<Eigen::Vector2f> q_new_;
 Eigen::Vector2f nav_goal_;
+int i_;
 
 
 namespace navigation {
@@ -101,6 +102,7 @@ Navigation::Navigation(const string& map_file, ros::NodeHandle* n) :
 
 void Navigation::SetNavGoal(const Vector2f& loc, float angle) {
   nav_goal_ = loc;
+  i_ = 1;
 }
 
 void Navigation::UpdateLocation(const Eigen::Vector2f& loc, float angle) {
@@ -262,13 +264,28 @@ void Navigation::Run(){
 
   // "Carrot on a stick" goal point, and resulting goal curvature
   path_goal_ = LocallySmoothedPathFollower(robot_loc_); // returns global frame point
-  Eigen::Vector2f path_goal_local = (path_goal_-robot_loc_);// + odom_loc_;
-  std::cout << "robot_location_.x: " << robot_loc_.x()
-            << "; robot_location_.y: " << robot_loc_.y()
-            << "; path_goal_local_.x: " << path_goal_local.x()
-            << "; path_goal_local_.y: " << path_goal_local.y()
-            << std::endl;
-  Eigen::Vector2f goal_point (4,0); // (3, 0);
+  //Eigen::Vector2f path_goal_local = (path_goal_-robot_loc_);// + odom_loc_;
+
+  /*
+  *std::cout << "robot_location_.x: " << robot_loc_.x()
+  *          << "; robot_location_.y: " << robot_loc_.y()
+  *          << "; path_goal_local_.x: " << path_goal_local.x()
+  *          << "; path_goal_local_.y: " << path_goal_local.y()
+  *          << std::endl;
+  */
+
+  
+  if (i_ == 1)
+    std::cout << "Initialized Odom (odom_loc: x= " << odom_loc_.x() << "; y= " << odom_loc_.y() << "; theta= " << odom_angle_ << ")" << std::endl;
+  i_++;
+
+  Eigen::Affine2f A_global_local = GetTransform(robot_loc_, odom_loc_, DegtoRad(robot_angle_), odom_angle_);
+
+  Eigen::Vector2f goal_point;// (abs(path_goal_local.x()),abs(path_goal_local.y())); // (3, 0);
+  goal_point = A_global_local * path_goal_; // Transform to local
+  std::cout << "goal point_ local x: " << goal_point.x() << "; y: " << goal_point.y() << std::endl;
+
+
   float goal_curvature = obstacle_avoidance::GetCurvatureFromGoalPoint(goal_point);
   goal_curvature = Clamp(goal_curvature, car_params::min_curvature, car_params::max_curvature);
 
@@ -472,22 +489,39 @@ Eigen::Vector2f Navigation::LocallySmoothedPathFollower(const Eigen::Vector2f ro
   Eigen::Vector2f closest_point (0,0);
   Eigen::Vector2f path_goal (0,0);
   int size = tree_.GetPathBack().size();
-  float max_carrot_dist = 4;
+  //float max_carrot_dist = 4;
+
+  //Eigen::Vector2f delta = robot_loc - path_goal;
+  //float mag = delta.norm();
 
   for (int j {0}; j < size; j++){
+
     // compare virtual line between vehicle location and path waypoints to map
     line2f robot_line (robot_loc.x(),robot_loc.y(), tree_.GetPathBack()[j].x(), tree_.GetPathBack()[j].y());
+
     for (size_t i {0}; i < map_.lines.size(); ++i){
       const line2f map_line = map_.lines[i];
       bool intersects = map_line.Intersection(robot_line, &closest_point);
-      if (intersects == true or (robot_line.Length() > max_carrot_dist))
+      if (intersects == true) //or (robot_line.Length() > max_carrot_dist))
         return path_goal;  
     }
+
     path_goal = tree_.GetPathBack()[j];
+
     if(j == (size-1))
       path_goal = nav_goal_;
+
   }
   return path_goal;
 }
 
+Eigen::Affine2f Navigation::GetTransform(const Eigen::Vector2f& from, const Eigen::Vector2f& to, const float& from_angle, const float& to_angle)
+{
+  Eigen::Vector2f delta_pos;
+  delta_pos = from - to;
+  float delta_angle = AngleDiff(from_angle,to_angle);
+  Eigen::Affine2f A_from_to = Eigen::Translation2f(delta_pos.x(),delta_pos.y()) * Eigen::Rotation2Df(delta_angle);
+  std::cout << A_from_to.matrix() << std::endl;
+  return A_from_to;
+}
 }  // namespace navigation

@@ -185,6 +185,9 @@ class Navigation {
   Eigen::Vector2f LocallySmoothedPathFollower(const Eigen::Vector2f robot_loc);
   // Path following navigation angle
   Eigen::Vector2f path_goal_;
+
+  // create transformation matrices
+  Eigen::Affine2f GetTransform(const Eigen::Vector2f& from, const Eigen::Vector2f& to, const float& from_angle, const float& to_angle);
 };
 
 }  // namespace navigation
