@@ -87,6 +87,9 @@ class Navigation {
    // Constructor
   explicit Navigation(const std::string& map_file, ros::NodeHandle* n);
 
+  // Used to set the next target pose.
+  void SetNavGoal(const Eigen::Vector2f& loc, float angle);
+
   // Used in callback from localization to update position.
   void UpdateLocation(const Eigen::Vector2f& loc, float angle);
 
@@ -100,25 +103,29 @@ class Navigation {
   // Updates based on an observed laser scan
   void ObservePointCloud(const std::vector<Eigen::Vector2f>& cloud,
                          uint64_t time);
+  
+  // Use time optimal strategy to control the car
+  void TimeOptimalControl(const PathOption& path);
+  
+  void TransformPointCloud(TimeShiftedTF transform);
 
   // Main function called continously from main
   void Run();
-  // Used to set the next target pose.
-  void SetNavGoal(const Eigen::Vector2f& loc, float angle);
-
-  // Use time optimal strategy to control the car
-  void TimeOptimalControl(const PathOption& path);
-
-  std::vector<CommandStamped> vel_commands_;
 
   // Added the following for RRT
-  void BuildRRT(const Eigen::Vector2f q_init, const Eigen::Vector2f q_goal);
-  
   void InitMap(const string& map_file);
+
+  void IsPathPlanned(bool path_planned);
+
+  Eigen::Vector2f FindIntersection(const Eigen::Vector2f A, const Eigen::Vector2f B);
+
+  void BuildRRT(const Eigen::Vector2f q_init, const Eigen::Vector2f q_goal);
 
   void Vizualize();
 
-  void IsPathPlanned(bool path_planned);
+  Eigen::Vector2f LocallySmoothedPathFollower(const Eigen::Vector2f robot_loc);
+
+  std::vector<CommandStamped> vel_commands_;
 
  private:
 
@@ -143,13 +150,12 @@ class Navigation {
   // Odometry-reported robot starting angle.
   float odom_start_angle_;
 
+  TimeShiftedTF odom_state_tf;
   // Last odometry timestamp
   uint64_t odom_stamp_;
-  uint64_t last_odom_stamp_ = 0;
+  uint64_t last_odom_stamp_;
   //Updates if odometry has new data
   bool has_new_odom_;
-
-  TimeShiftedTF odom_state_tf;
 
   // Latest observed point cloud.
   std::vector<Eigen::Vector2f> point_cloud_;
@@ -167,24 +173,18 @@ class Navigation {
   // Navigation goal angle.
   float nav_goal_angle_;
 
+  bool path_planned_;
+  // Path following navigation angle
+  Eigen::Vector2f path_goal_;
+
   bool first_cycle = true;
-
-  void TransformPointCloud(TimeShiftedTF transform);
-
-  // Added for RRT
-  Eigen::Vector2f FindIntersection(const Eigen::Vector2f A, const Eigen::Vector2f B);
 
   RRTGraph tree_;
 
   // Map of the environment.
   vector_map::VectorMap map_;
 
-  bool path_planned_;
-
-  // Path Follower
-  Eigen::Vector2f LocallySmoothedPathFollower(const Eigen::Vector2f robot_loc);
-  // Path following navigation angle
-  Eigen::Vector2f path_goal_;
+  int last_path_point;
 
   // create transformation matrices
   Eigen::Affine2f GetTransform(const Eigen::Vector2f& from, const Eigen::Vector2f& to, const float& from_angle, const float& to_angle);

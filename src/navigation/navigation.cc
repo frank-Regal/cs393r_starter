@@ -87,7 +87,8 @@ Navigation::Navigation(const string& map_file, ros::NodeHandle* n) :
     nav_goal_loc_(0, 0),
     nav_goal_angle_(0),
     path_planned_(false),
-    path_goal_(0,0) {
+    path_goal_(0,0),
+    last_path_point(0) {
   drive_pub_ = n->advertise<AckermannCurvatureDriveMsg>(
       "ackermann_curvature_drive", 1);
   viz_pub_ = n->advertise<VisualizationMsg>("visualization", 1);
@@ -103,6 +104,7 @@ Navigation::Navigation(const string& map_file, ros::NodeHandle* n) :
 void Navigation::SetNavGoal(const Vector2f& loc, float angle) {
   nav_goal_ = loc;
   i_ = 1;
+
 }
 
 void Navigation::UpdateLocation(const Eigen::Vector2f& loc, float angle) {
@@ -279,7 +281,7 @@ void Navigation::Run(){
     std::cout << "Initialized Odom (odom_loc: x= " << odom_loc_.x() << "; y= " << odom_loc_.y() << "; theta= " << odom_angle_ << ")" << std::endl;
   i_++;
 
-  Eigen::Affine2f A_global_local = GetTransform(robot_loc_, odom_loc_, DegtoRad(robot_angle_), odom_angle_);
+  Eigen::Affine2f A_global_local = GetTransform(robot_loc_, odom_loc_, DegToRad(robot_angle_), odom_angle_);
 
   Eigen::Vector2f goal_point;// (abs(path_goal_local.x()),abs(path_goal_local.y())); // (3, 0);
   goal_point = A_global_local * path_goal_; // Transform to local
@@ -493,8 +495,11 @@ Eigen::Vector2f Navigation::LocallySmoothedPathFollower(const Eigen::Vector2f ro
 
   //Eigen::Vector2f delta = robot_loc - path_goal;
   //float mag = delta.norm();
+  //float max_carrot_dist = 4;
+  int n = last_path_point;
 
-  for (int j {0}; j < size; j++){
+  for (int j = n ; j < size; j++){
+  
 
     // compare virtual line between vehicle location and path waypoints to map
     line2f robot_line (robot_loc.x(),robot_loc.y(), tree_.GetPathBack()[j].x(), tree_.GetPathBack()[j].y());
@@ -507,7 +512,7 @@ Eigen::Vector2f Navigation::LocallySmoothedPathFollower(const Eigen::Vector2f ro
     }
 
     path_goal = tree_.GetPathBack()[j];
-
+    last_path_point = j;
     if(j == (size-1))
       path_goal = nav_goal_;
 
