@@ -317,6 +317,13 @@ void Navigation::Run(){
 
   path_goal_ = LocallySmoothedPathFollower(robot_loc_); // returns global frame point
 
+  std::cout << "path goal_  x: " << path_goal_.x() << "; y: " << path_goal_.y() << std::endl;
+
+  if(path_goal_.x() == 0 and path_goal_.y() == 0){
+    last_path_point = 0;
+    path_goal_ = LocallySmoothedPathFollower(robot_loc_);
+  }
+
   Eigen::Vector3f Vs (path_goal_.x(),path_goal_.y(), 1);
   Eigen::Vector3f Vm = TSM.inverse() * Vs;
   Eigen::Vector2f Vm2 (Vm.x(),Vm.y());
@@ -326,7 +333,7 @@ void Navigation::Run(){
   Eigen::Vector2f check;
   check.x() = nav_goal_.x() - robot_loc_.x(); // Transform to local
   check.y() = nav_goal_.y() - robot_loc_.y();
-  if(check.norm() < 0.8)
+  if(check.norm() < 0.5)
     return;
   std::cout << "goal point_ local x: " << goal_point.x() << "; y: " << goal_point.y() << std::endl;
 
