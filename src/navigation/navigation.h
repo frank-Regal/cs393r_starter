@@ -125,6 +125,9 @@ class Navigation {
 
   Eigen::Vector2f LocallySmoothedPathFollower(const Eigen::Vector2f robot_loc);
 
+  // create transformation matrices
+  Eigen::Affine2f GetTransform(const Eigen::Vector2f& from, const Eigen::Vector2f& to, const float& from_angle, const float& to_angle);
+
   std::vector<CommandStamped> vel_commands_;
 
  private:
@@ -186,9 +189,7 @@ class Navigation {
 
   int last_path_point;
 
-  // create transformation matrices
-  Eigen::Affine2f GetTransform(const Eigen::Vector2f& from, const Eigen::Vector2f& to, const float& from_angle, const float& to_angle);
-};
+  };
 
 }  // namespace navigation
 
