@@ -42,12 +42,12 @@ const float min_curvature = -1.0;
 // Dynamics
 const float max_acceleration = 6.0;
 const float min_acceleration = -6.0;
-const float max_velocity = 1.25;
+const float max_velocity = 1.0;
 
 
 // Algorithmic Parameters
-const float safe_distance = 0.10; // safe distance used in TOC control, stops with 5" left to obstacle
-const float max_path_length = 7.0;
+const float safe_distance = 0.15; // safe distance used in TOC control, stops with 5" left to obstacle
+const float max_path_length = 4.0;
 const float curvature_increment = 0.02;
 const float num_curves = floor((max_curvature - min_curvature)/curvature_increment) + 1;
 

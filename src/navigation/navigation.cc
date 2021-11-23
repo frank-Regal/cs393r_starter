@@ -71,7 +71,9 @@ std::vector<Eigen::Vector2f> q_rand_;
 std::vector<Eigen::Vector2f> q_trim_;
 std::vector<Eigen::Vector2f> q_new_;
 Eigen::Vector2f nav_goal_;
+float nav_goal_angle_;
 int i_;
+Eigen::Vector2f goal_point_;
 
 
 namespace navigation {
@@ -103,7 +105,21 @@ Navigation::Navigation(const string& map_file, ros::NodeHandle* n) :
 
 void Navigation::SetNavGoal(const Vector2f& loc, float angle) {
   nav_goal_ = loc;
+  nav_goal_angle_ = angle;
   i_ = 1;
+  std::cout << "Initialized Odom (odom_loc: x= " << odom_loc_.x() << "; y= " << odom_loc_.y() << "; theta= " << odom_angle_ << ")" << std::endl;
+  goal_point_.x() = nav_goal_.x();
+  goal_point_.y() = nav_goal_.y();
+  /*
+  Eigen::Affine2f A_global_local = GetTransform(robot_loc_, odom_loc_, DegToRad(robot_angle_), odom_angle_);
+  path_goal_ = LocallySmoothedPathFollower(robot_loc_); // returns global frame point
+  //goal_point_ = A_global_local * path_goal_;            // Transform to local
+  std::cout << "path_goal_ x: " << path_goal_.x() << "; y: " << path_goal_.y() << std::endl;
+  Eigen::Vector2f delta = path_goal_ - robot_loc_;
+  goal_point_.x() =  abs(delta.x())+odom_loc_.x();
+  goal_point_.y() =  abs(delta.y())+odom_loc_.y();
+  */
+
 
 }
 
@@ -265,28 +281,52 @@ void Navigation::Run(){
   //obstacle_avoidance::DrawCarLocal(local_viz_msg_, odom_state_tf.position, odom_state_tf.theta);
 
   // "Carrot on a stick" goal point, and resulting goal curvature
-  path_goal_ = LocallySmoothedPathFollower(robot_loc_); // returns global frame point
-  //Eigen::Vector2f path_goal_local = (path_goal_-robot_loc_);// + odom_loc_;
 
+  Eigen::Vector2f goal_point;  
+  
   /*
-  *std::cout << "robot_location_.x: " << robot_loc_.x()
-  *          << "; robot_location_.y: " << robot_loc_.y()
-  *          << "; path_goal_local_.x: " << path_goal_local.x()
-  *          << "; path_goal_local_.y: " << path_goal_local.y()
-  *          << std::endl;
+  // Transformation from robot in map frame to goal location in map frame
+  Eigen::Vector2f delta_trans_tmg = robot_loc_ - nav_goal_;
+  float delta_angle_tmg = AngleDiff(robot_angle_,nav_goal_angle_);
+  Eigen::Affine2f Tmg = Eigen::Translation2f(delta_trans_tmg) * Eigen::Rotation2Df(delta_angle_tmg);
+
+  // Transformation from robot in map frame to odom frame
+  Eigen::Vector2f delta_trans_Tmo= robot_loc_ - odom_loc_;
+  float delta_angle_Tmo = -AngleDiff(DegToRad(robot_angle_),odom_angle_);
+  Eigen::Affine2f Tmo = Eigen::Translation2f(delta_trans_Tmo) * Eigen::Rotation2Df(delta_angle_Tmo);
+  
+  // Transformation from robot odom frame to baselink frame
+  Eigen::Vector2f baselink_loc (0.2,0);
+  Eigen::Vector2f delta_trans_Tor = odom_loc_ - baselink_loc;
+  float delta_angle_Tor = 0;
+  Eigen::Affine2f Tor = Eigen::Translation2f(delta_trans_Tor) * Eigen::Rotation2Df(delta_angle_Tor);
+  
+  goal_point = Tor.inverse() * Tmo.inverse() * Tmg * nav_goal_;
   */
 
+ // Nav Goal (point relative to m)
   
-  if (i_ == 1)
-    std::cout << "Initialized Odom (odom_loc: x= " << odom_loc_.x() << "; y= " << odom_loc_.y() << "; theta= " << odom_angle_ << ")" << std::endl;
-  i_++;
 
-  Eigen::Affine2f A_global_local = GetTransform(robot_loc_, odom_loc_, DegToRad(robot_angle_), odom_angle_);
+ // transformation s relative to m (map)
+  float del_t_sm = robot_angle_; // angle from robot map m frame to fixed map frame s
+  Eigen::Vector2f del_loc_sm = robot_loc_;
+  Eigen::MatrixXf TSM(3,3);
+  TSM  << cos(del_t_sm), -sin(del_t_sm), del_loc_sm.x(),
+         sin(del_t_sm),  cos(del_t_sm) , del_loc_sm.y(),
+         0, 0, 1;
 
-  Eigen::Vector2f goal_point;// (abs(path_goal_local.x()),abs(path_goal_local.y())); // (3, 0);
-  goal_point = A_global_local * path_goal_; // Transform to local
+  Eigen::Vector3f Vs (nav_goal_.x(),nav_goal_.y(), 1);
+  Eigen::Vector3f Vm = TSM.inverse() * Vs;
+  Eigen::Vector2f Vm2 (Vm.x(),Vm.y());
+
+  goal_point = Vm2;
+
+  Eigen::Vector2f check;
+  check.x() = nav_goal_.x() - robot_loc_.x(); // Transform to local
+  check.y() = nav_goal_.y() - robot_loc_.y();
+  if(check.norm() < 0.8)
+    return;
   std::cout << "goal point_ local x: " << goal_point.x() << "; y: " << goal_point.y() << std::endl;
-
 
   float goal_curvature = obstacle_avoidance::GetCurvatureFromGoalPoint(goal_point);
   goal_curvature = Clamp(goal_curvature, car_params::min_curvature, car_params::max_curvature);
@@ -323,27 +363,8 @@ void Navigation::Run(){
   // 7) Publish commands with 1-D TOC, update vector of previous vehicle commands
   TimeOptimalControl(best_path);
 
-    // static double start_timer;
-    // if(first_cycle){
-    //   first_cycle = false;
-    //   start_timer = GetMonotonicTime();
-    //   std::cout << "Start Time: " << start_timer << std::endl;
-    //   std::cout << "Start Time + 2: " << start_timer + 2<< std::endl;
-    // }
-
-    // // Remove for obstacle avoidance
-    // std::cout << "Curr Time: " << GetMonotonicTime() << std::endl;
-    // if(GetMonotonicTime() < start_timer + 1.0){
-    //   drive_msg_.curvature = 0.0;
-    //   drive_msg_.velocity = 1.0;
-    // }
-    // else{
-    //   drive_msg_.curvature = 0.0;
-    //   drive_msg_.velocity = 0.0;
-    // }
-
-    drive_pub_.publish(drive_msg_);
-    // Remove for obstacle avoidance
+  drive_pub_.publish(drive_msg_);
+  // Remove for obstacle avoidance
     
   CommandStamped drive_cmd(drive_msg_.velocity, drive_msg_.curvature, drive_msg_.header.stamp.toNSec() + car_params::actuation_latency);
   vel_commands_.push_back(drive_cmd);
@@ -526,7 +547,7 @@ Eigen::Affine2f Navigation::GetTransform(const Eigen::Vector2f& from, const Eige
   delta_pos = from - to;
   float delta_angle = AngleDiff(from_angle,to_angle);
   Eigen::Affine2f A_from_to = Eigen::Translation2f(delta_pos.x(),delta_pos.y()) * Eigen::Rotation2Df(delta_angle);
-  std::cout << A_from_to.matrix() << std::endl;
+  std::cout << "\n" << A_from_to.matrix() << std::endl;
   return A_from_to;
 }
 }  // namespace navigation

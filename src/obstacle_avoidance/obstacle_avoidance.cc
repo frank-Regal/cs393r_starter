@@ -266,7 +266,7 @@ void VisualizeObstacleAvoidanceInfo(Eigen::Vector2f& goal,
                            const navigation::PathOption& selected_path,
                            amrl_msgs::VisualizationMsg &msg){
     CarOutliner(msg);
-    PossiblePathsOutliner(paths,msg);
+    //PossiblePathsOutliner(paths,msg);
     SelectedPathOutliner(selected_path,msg);
     GoalOutliner(goal,msg);
 }
