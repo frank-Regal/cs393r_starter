@@ -315,7 +315,9 @@ void Navigation::Run(){
          sin(del_t_sm),  cos(del_t_sm) , del_loc_sm.y(),
          0, 0, 1;
 
-  Eigen::Vector3f Vs (nav_goal_.x(),nav_goal_.y(), 1);
+  path_goal_ = LocallySmoothedPathFollower(robot_loc_); // returns global frame point
+
+  Eigen::Vector3f Vs (path_goal_.x(),path_goal_.y(), 1);
   Eigen::Vector3f Vm = TSM.inverse() * Vs;
   Eigen::Vector2f Vm2 (Vm.x(),Vm.y());
 
