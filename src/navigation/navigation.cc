@@ -314,7 +314,26 @@ void Navigation::Run(){
   TSM  << cos(del_t_sm), -sin(del_t_sm), del_loc_sm.x(),
          sin(del_t_sm),  cos(del_t_sm) , del_loc_sm.y(),
          0, 0, 1;
+
+  Eigen::Vector2f dist_from_path_goal;
+  dist_from_path_goal.x() = robot_loc_.x() - path_goal_.x();  
+  dist_from_path_goal.y() = robot_loc_.x() - path_goal_.x(); 
+  if (dist_from_path_goal.norm() == 0){
+    tree_.ClearTree();
+    std::cout << "rebuilding tree" << std::endl;
+    BuildRRT(robot_loc_, nav_goal_);
+  }
+
   path_goal_ = LocallySmoothedPathFollower(robot_loc_); // returns global frame point
+
+  // std::cout << "path goal_  x: " << path_goal_.x() << "; y: " << path_goal_.y() << std::endl;
+
+  if (path_goal_.x() == 0 and path_goal_.y() == 0){
+    last_path_point = 0; 
+    path_goal_ = robot_loc_;
+    return;
+  }
+
   Eigen::Vector3f Vs (path_goal_.x(),path_goal_.y(), 1);
   Eigen::Vector3f Vm = TSM.inverse() * Vs;
   Eigen::Vector2f Vm2 (Vm.x(),Vm.y());
@@ -324,10 +343,9 @@ void Navigation::Run(){
   Eigen::Vector2f check;
   check.x() = nav_goal_.x() - robot_loc_.x(); // Transform to local
   check.y() = nav_goal_.y() - robot_loc_.y();
-  if(check.norm() < 0.8)
+  if(check.norm() < 0.5)
     return;
-  //std::cout << "goal point_ local x: " << goal_point.x() << "; y: " << goal_point.y() << std::endl;
-
+    
   float goal_curvature = obstacle_avoidance::GetCurvatureFromGoalPoint(goal_point);
   goal_curvature = Clamp(goal_curvature, car_params::min_curvature, car_params::max_curvature);
 
