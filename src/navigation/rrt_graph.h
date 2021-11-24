@@ -52,6 +52,8 @@ std::vector<std::vector<Eigen::Vector2f>> GetEdges();
 
 std::deque<Eigen::Vector2f> GetPathBack();
 
+void ClearPath();
+
 };
 
 #endif // RRT_GRAPH_H

@@ -23,6 +23,11 @@ void RRTGraph::ClearTree()
     tree_edge.clear();
 }
 
+void RRTGraph::ClearPath()
+{
+    path_to_goal.clear();
+}
+
 void RRTGraph::SetInitNode(const Eigen::Vector2f& node)
 {
     init_node << node;
