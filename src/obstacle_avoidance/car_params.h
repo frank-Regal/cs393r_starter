@@ -26,11 +26,11 @@
 namespace car_params{
 
 // Geometry
-const float length = 0.508; // 20"
-const float width = 0.2667; // 10.5"
-const float wheel_base = 0.32385; // 12.75"
-const float track_width = 0.235; // 9.25
-const float safety_margin = 0.05; // 2"
+const float length = 0.508;        // 20"
+const float width = 0.2667;        // 10.5"
+const float wheel_base = 0.32385;  // 12.75"
+const float track_width = 0.235;   // 9.25"
+const float safety_margin = 0.125; // 5" - was 2"
 
 const float dist_to_front_bumper = (length + wheel_base)/2 + safety_margin;
 const float dist_to_side_bumper = width/2 + safety_margin;
