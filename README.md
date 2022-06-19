@@ -1,4 +1,7 @@
-# cs393r_starter
+# CS393R Autonomous Robot - SLAM Package
+
+## Working Demos
+
 
 ## Using this Repo
 You will be using a duplicate of this repo for all development in the class. This repo provides starter code for the ROS subscriptions, publishers and control loops you will be using.
