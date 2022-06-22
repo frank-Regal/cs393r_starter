@@ -2,9 +2,11 @@
 
 ## Working Demos
 
+[![Alt text](/media/auto_robots_small.png)](https://www.youtube.com/watch?v=T1k6jVhmOvw)
+Click on image to open youtube video of simulation.
 
 ## Using this Repo
-You will be using a duplicate of this repo for all development in the class. This repo provides starter code for the ROS subscriptions, publishers and control loops you will be using.
+Navigate to the correct branch to find the proper part of the SLAM package you need and clone.
 
 ### Prerequisites
 
