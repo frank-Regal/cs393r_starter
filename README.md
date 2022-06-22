@@ -3,10 +3,10 @@
 ## Working Demos
 
 [![Alt text](/media/auto_robots_small.png)](https://www.youtube.com/watch?v=T1k6jVhmOvw)
+
 Click on image to open youtube video of simulation.
 
 ## Using this Repo
-Navigate to the correct branch to find the proper part of the SLAM package you need and clone.
 
 ### Prerequisites
 
